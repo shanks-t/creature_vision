@@ -1,0 +1,7 @@
+Flask
+Pillow
+requests
+google-cloud-storage
+tensorflow
+fuzzywuzzy
+python-Levenshtein

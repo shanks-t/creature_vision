@@ -68,15 +68,81 @@ This project implements a continual learning system for animal classification us
 
 ### 5. Monitoring and Analysis Setup
 
-- Configure Cloud Monitoring:
-  - Set up alerts for model performance degradation
-  - Monitor system health (e.g., Cloud Function executions, Cloud Run metrics)
-- Create BigQuery queries for performance analysis:
-  - Model accuracy over time
-  - Distribution of animal classes in the dataset
-  - User feedback trends
-- Develop a dashboard using Data Studio or Looker:
-  - Visualize key metrics and trends
+## Hybrid Approach
+
+### Overview
+- Use Google Cloud Monitoring for data collection
+- Export aggregated data periodically to local InfluxDB instance
+- Visualize data using locally hosted Grafana
+
+### Benefits
+1. Leverages GCP's built-in monitoring capabilities
+2. Minimizes data transfer and storage costs by aggregating before export
+3. Maintains local control over visualization and long-term data storage
+4. Simplifies setup by using cloud services for data collection
+
+### Implementation Steps
+
+#### 1. Set up Google Cloud Monitoring
+- Enable Cloud Monitoring API in your GCP project
+- Configure custom metrics for:
+  * Model accuracy
+  * Number of images processed
+  * Number of incorrect predictions
+  * Retraining events
+- Set up log-based metrics for specific events
+
+#### 2. Create a Cloud Function for Data Export
+- Develop a Python Cloud Function that:
+  * Queries Cloud Monitoring for aggregated metrics
+  * Formats data for InfluxDB
+  * Securely sends data to your local InfluxDB instance
+- Deploy the Cloud Function to GCP
+- Set up Cloud Scheduler to trigger the function periodically (e.g., hourly)
+
+#### 3. Configure Local VM
+- Set up a VM on your local network (e.g., using VirtualBox or VMware)
+- Install Ubuntu Server or another Linux distribution
+- Configure network to allow incoming connections from GCP and local network
+
+#### 4. Install and Configure InfluxDB
+- Install InfluxDB on the local VM
+- Create a database for storing monitoring data
+- Set up authentication and secure the database
+- Configure firewall to allow incoming connections from GCP
+
+#### 5. Install and Configure Grafana
+- Install Grafana on the local VM
+- Configure Grafana to use InfluxDB as a data source
+- Set up user authentication for Grafana
+
+#### 6. Create Grafana Dashboards
+- Design dashboards for:
+  * Model performance overview
+  * Data collection statistics
+  * Retraining events and model versions
+  * System health metrics
+
+#### 7. Set up Secure Communication
+- Configure VPN or SSH tunnel between GCP and local network
+- Use HTTPS for all data transfers
+- Implement proper authentication for the Cloud Function to access local InfluxDB
+
+#### 8. Implement Alerting
+- Set up Grafana alerting for critical metrics
+- Configure email or messaging integration for alerts
+
+### Maintenance and Optimization
+- Regularly review and optimize Cloud Monitoring metrics
+- Adjust data aggregation and export frequency based on needs
+- Periodically update Grafana dashboards for improved visualizations
+- Monitor local VM performance and scale resources as needed
+
+### Considerations
+- **Data Retention**: Determine how long to keep detailed data in InfluxDB
+- **Backup Strategy**: Implement regular backups of InfluxDB data
+- **Network Security**: Ensure proper firewall and access controls between GCP and local network
+- **Scalability**: Plan for increased data volume as the project grows
 
 ### 6. Testing and Optimization
 
