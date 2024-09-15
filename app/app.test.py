@@ -81,8 +81,8 @@ def save_image_and_label(img, model_label, api_label, is_correct):
     with open(label_path, 'w') as f:
         json.dump(label_data, f)
     
-    print(f"Saved image to {img_path}")
-    print(f"Saved label to {label_path}")
+    # print(f"Saved image to {img_path}")
+    # print(f"Saved label to {label_path}")
 
 # def save_image_and_label(img, breed, is_correct):
 #     directory = "correct_predictions" if is_correct else "incorrect_predictions"
@@ -160,12 +160,12 @@ def run_prediction(event, context):
             print(f"Fuzzy match result: {is_correct}")
         
         if is_correct:
-            print(f"Correct prediction: {api_label}")
+            # print(f"Correct prediction: {api_label}")
             result = {'status': 'correct', 'actual': api_label, 'predicted': model_label}
             # if the prediciton is corract preserve the models label prediction and add to dataset
             save_image_and_label(img, model_label, api_label, is_correct)
         else:
-            print(f"Incorrect prediction. Actual: {api_label}, Predicted: {model_label}")
+            # print(f"Incorrect prediction. Actual: {api_label}, Predicted: {model_label}")
             result = {'status': 'incorrect', 'actual': api_label, 'predicted': model_label}
             # if the prediction is incorrect add the data with the correct label to dataset
             save_image_and_label(img, model_label, api_label, is_correct)
@@ -173,7 +173,7 @@ def run_prediction(event, context):
         # Here you could log the result to Cloud Logging or save to a database
         print(f"Prediction result: {result}")
         
-        return result
+        return "fin"
     
     except Exception as e:
         print(f"An error occurred: {str(e)}")

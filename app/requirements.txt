@@ -1,7 +1,8 @@
-Flask
-Pillow
+flask
+gunicorn
+tensorflow
+pillow
 requests
 google-cloud-storage
-tensorflow
 fuzzywuzzy
-python-Levenshtein
+numpy

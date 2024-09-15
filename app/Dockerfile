@@ -1,43 +1,22 @@
-# Start with a base image that supports both amd64 and arm64
-FROM --platform=$BUILDPLATFORM python:3.10-slim as base
+# Use the official lightweight Python image.
+FROM python:3.9-slim
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+# Allow statements and log messages to immediately appear in the logs
+ENV PYTHONUNBUFFERED True
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
+# Copy local code to the container image.
+COPY app.py ./app/
+
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libhdf5-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN useradd -m -s /bin/bash app
-WORKDIR /app
-USER app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Python dependencies
-COPY --chown=app:app requirements.txt .
-RUN pip install --user -r requirements.txt
-
-# Copy application code
-COPY --chown=app:app . .
-
-# Set up environment for different architectures
-FROM base as amd64
-ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib64
-
-FROM base as arm64
-
-# Use multi-stage build to create the final image
-FROM ${TARGETARCH}
-
-# Install TensorFlow Metal for M1/M2 Macs (only for arm64)
-RUN if [ "$(uname -m)" = "arm64" ]; then \
-    pip install --user tensorflow-macos tensorflow-metal; \
-    fi
-
-# Set the entrypoint
-CMD ["python", "app.py"]
+# Run the web service on container startup. Here we use the gunicorn
+# webserver, with one worker process and 8 threads.
+# For environments with multiple CPU cores, increase the number of workers
+# to be equal to the cores available.
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app
