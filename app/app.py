@@ -1,5 +1,6 @@
 import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2, preprocess_input, decode_predictions
+from tensorflow.keras.models import load_model
+from tensorflow.keras.applications.mobilenet_v3 import preprocess_input, decode_predictions
 import numpy as np
 from PIL import Image
 from io import BytesIO
@@ -19,10 +20,10 @@ else:
     print("Running on CPU or Metal")
 
 # Load the pre-trained MobileNetV2 model
-model = MobileNetV2(weights='imagenet')
+model = load_model("./mobile_net_v3_small.keras")
 
 # Initialize Google Cloud Storage client
-storage_client = storage.Client()
+storage_client = storage.Client(project="creature-vision")
 bucket_name = 'creature-vision-training-set' 
 bucket = storage_client.bucket(bucket_name)
 

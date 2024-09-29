@@ -12,9 +12,11 @@ services:
     platform: linux/arm64
     ports:
       - "8080:8080"
-    environment:
-      - PORT=8080
-      - TF_FORCE_GPU_ALLOW_GROWTH=true
     volumes:
-      - .:/app
-    command: ["python", "app.py"]
+      - ~/.config/gcloud:/root/.config/gcloud
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
+

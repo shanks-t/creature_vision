@@ -20,5 +20,7 @@ coverage.xml
 .hypothesis
 
 Dockerfile
-docker-compose.yml
+docker-compose.*
 .dockerignore
+
+app.test.py
