@@ -1,8 +1,10 @@
 flask
-gunicorn
 tensorflow
 pillow
 requests
 google-cloud-storage
+python-Levenshtein
 fuzzywuzzy
 numpy
+prometheus-client
+structlog

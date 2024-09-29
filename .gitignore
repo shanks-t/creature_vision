@@ -203,3 +203,5 @@ terraform.rc
 .terraform.lock.hcl
 
 data/
+
+mobile_net_v3_small.keras

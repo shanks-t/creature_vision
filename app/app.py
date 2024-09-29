@@ -8,16 +8,35 @@ import requests
 import time
 from google.cloud import storage
 from fuzzywuzzy import fuzz
+import Levenshtein
 import os
 import json
 from flask import Flask, jsonify
+import structlog
+from prometheus_client import make_wsgi_app, Counter, Histogram
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+
+structlog.configure(
+    processors=[
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
+
+PREDICTIONS_TOTAL = Counter('predictions_total', 'Total number of predictions made')
+CORRECT_PREDICTIONS = Counter('correct_predictions', 'Number of correct predictions')
+PREDICTION_LATENCY = Histogram('prediction_latency_seconds', 'Latency of predictions')
+
+logger = structlog.get_logger()
 
 app = Flask(__name__)
 
-if tf.test.is_built_with_cuda():
-    print("GPU acceleration enabled")
-else:
-    print("Running on CPU or Metal")
 
 # Load the pre-trained MobileNetV2 model
 model = load_model("./mobile_net_v3_small.keras")
@@ -117,19 +136,22 @@ def fuzzy_match(actual, predicted, threshold=85):
 @app.route('/predict', methods=['GET'])
 def run_prediction():
     try:
+        start_time = time.time()
         img_array, img, api_label = load_random_dog_image()
-        predictions = model.predict(img_array)
-        decoded_predictions = decode_predictions(predictions, top=3)[0]
         
-        # Get top predicted breed (highest confidence)
+        with PREDICTION_LATENCY.time():
+            predictions = model.predict(img_array)
+        
+        decoded_predictions = decode_predictions(predictions, top=3)[0]
         model_label = decoded_predictions[0][1]
         
-        # First, try exact matching (ignoring order)
         is_correct = compare_breeds(api_label, model_label)
-        
-        # If not correct, try fuzzy matching
         if not is_correct:
             is_correct = fuzzy_match(api_label, model_label)
+        
+        PREDICTIONS_TOTAL.inc()
+        if is_correct:
+            CORRECT_PREDICTIONS.inc()
         
         result = {
             'status': 'correct' if is_correct else 'incorrect',
@@ -137,17 +159,33 @@ def run_prediction():
             'predicted': model_label
         }
         
-        # Save image and label
         save_image_and_label(img, model_label, api_label, is_correct)
+        
+        logger.info("Prediction made",
+                    actual=api_label,
+                    predicted=model_label,
+                    is_correct=is_correct,
+                    latency=time.time() - start_time)
         
         return jsonify(result)
     
     except Exception as e:
+        logger.exception("Error during prediction", error=str(e))
         return jsonify({'error': str(e)}), 500
 
 @app.route('/', methods=['GET'])
 def health_check():
     return "Service is running", 200
 
+# Add the metrics endpoint
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+    '/metrics': make_wsgi_app()
+})
+
 if __name__ == "__main__":
+    if tf.test.is_built_with_cuda():
+        print("GPU acceleration enabled")
+    else:
+        print("Running on CPU or Metal")
+
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
