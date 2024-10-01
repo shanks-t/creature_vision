@@ -1,0 +1,9 @@
+groups:
+  - name: custom_metrics
+    interval: 5s
+    rules:
+      - record: prediction_accuracy_percentage
+        expr: round(rate(correct_predictions_total[1h]) / rate(predictions_total[1h]) * 100, 0.1)
+      
+      - record: prediction_latency_avg
+        expr: rate(prediction_latency_seconds_sum[10m]) / rate(prediction_latency_seconds_count[10m])
