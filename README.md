@@ -85,7 +85,26 @@
 
 1. Create a new VM by cloning the VM template we’ve just created.
     ```
-    qm clone 9000 9001 --name bastion --full true
+    qm clone 800 801 --name bastion --full true
     ```
-
+2. Configure SSH keys for bastion user authentication.
+    ```
+    qm set 801 --sshkey ~/proxmox-kubernetes/ssh-keys/id_rsa.pub
+    ```
+3. Plug the bastion VM into the LAN network by setting the appropriate IP and gateway configuration. Replace 192.168.1.131 with your desired IP.
+    ```
+    qm set 801 --net0 virtio,bridge=vmbr0 --ipconfig0 ip=10.0.0.100/24,gw=10.0.0.1
+    ```
+4. Connect the bastion VM to the Kubernetes internal network bridge vmbr1.
+    ```
+    qm set 801 --net1 virtio,bridge=vmbr1 --ipconfig1 ip=10.0.1.2/24,gw=10.0.1.1
+    ```
+5. Configure the bastion VM to start at boot.
+    ```
+    qm set 801 --onboot 1
+    ```
+6. Start the bastion VM.
+    ```
+    qm start 801
+    ```
 
