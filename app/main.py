@@ -169,7 +169,7 @@ def run_prediction():
         latency = time.time() - start_time 
         
         result = {
-            'status': is_correct,
+            'is_correct': is_correct,
             'actual': api_label,
             'predicted': model_label,
             'confidence': confidence,
