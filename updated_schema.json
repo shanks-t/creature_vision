@@ -1,0 +1,26 @@
+[
+    {
+        "name": "timestamp",
+        "type": "TIMESTAMP"
+    },
+    {
+        "name": "actual",
+        "type": "STRING"
+    },
+    {
+        "name": "predicted",
+        "type": "STRING"
+    },
+    {
+        "name": "confidence",
+        "type": "FLOAT"
+    },
+    {
+        "name": "is_correct",
+        "type": "BOOLEAN"
+    },
+    {
+        "name": "latency",
+        "type": "FLOAT"
+    }
+]

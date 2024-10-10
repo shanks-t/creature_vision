@@ -1,0 +1,2 @@
+FATAL Flags positioning error: Flag '--schema' appears after final command line argument. Please reposition the flag.
+Run 'bq help' to get help.

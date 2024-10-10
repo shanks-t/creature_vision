@@ -3,8 +3,8 @@ tensorflow
 pillow
 requests
 google-cloud-storage
+google-cloud-bigquery
 python-Levenshtein
 fuzzywuzzy
 numpy
-prometheus-client
 structlog
