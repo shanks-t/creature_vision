@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.keras.models import load_model
 from tensorflow.keras.applications.mobilenet_v3 import preprocess_input, decode_predictions
 import numpy as np
 from PIL import Image
@@ -37,9 +36,8 @@ logger = structlog.get_logger()
 
 app = Flask(__name__)
 
-
-# Load the pre-trained MobileNetV2 model
-model = load_model("./mobile_net_v3_small.keras")
+# This should match the service name in docker-compose
+TFSERVING_URL = "https://tfserving-284159624099.us-east1.run.app/""
 
 # Initialize Google Cloud Storage client
 storage_client = storage.Client(project="creature-vision")
@@ -133,6 +131,16 @@ def fuzzy_match(actual, predicted, threshold=85):
     ratio = fuzz.ratio(actual.lower(), predicted.lower())
     return ratio >= threshold
 
+def predict_with_tfserving(img_array):
+    url = f"http://{TFSERVING_HOST}:{TFSERVING_PORT}/v1/models/{MODEL_NAME}/versions/1:predict"
+    data = json.dumps({"instances": img_array.tolist()})
+    headers = {"content-type": "application/json"}
+    
+    response = requests.post(url, data=data, headers=headers)
+    response.raise_for_status()
+    predictions = response.json()['predictions']
+    return predictions
+
 @app.route('/predict', methods=['GET'])
 def run_prediction():
     try:
@@ -140,7 +148,7 @@ def run_prediction():
         img_array, img, api_label = load_random_dog_image()
         
         with PREDICTION_LATENCY.time():
-            predictions = model.predict(img_array)
+            predictions = predict_with_tfserving(img_array)
         
         decoded_predictions = decode_predictions(predictions, top=3)[0]
         model_label = decoded_predictions[0][1]

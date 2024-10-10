@@ -17,6 +17,31 @@ services:
         limits:
           memory: 1G
           cpus: '1'
+    depends_on:
+      tfserving:
+        condition: service_healthy
+
+  tfserving:
+    image: emacski/tensorflow-serving:latest-linux_arm64
+    platform: linux/arm64
+    ports:
+      - "8501:8501"  # REST API
+      - "8500:8500"  # gRPC
+    volumes:
+      - ../models:/models
+    command: 
+      - "--model_config_file=/models/models.config"
+      - "--model_config_file_poll_wait_seconds=60"
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: '2'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/v1/models/dog_classifier"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   prometheus:
     image: prom/prometheus:v2.30.3
