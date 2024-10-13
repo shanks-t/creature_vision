@@ -6,7 +6,8 @@ services:
       args:
         - BUILDPLATFORM=linux/amd64
         - TARGETARCH=amd64
-    image: gcr.io/${PROJECT_ID}/dog-prediction-app:latest
+        - MODEL_VERSION=${VERSION}
+    image: creature-vision/dog-prediction-app:${VERSION}
     platform: linux/amd64
     ports:
       - "8080:8080"
@@ -14,11 +15,4 @@ services:
       - ~/.config/gcloud:/root/.config/gcloud
     environment:
       - PORT=8080
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1'
-    depends_on:
-      tfserving:
-        condition: service_healthy
+      - MODEL_VERSION=${VERSION}

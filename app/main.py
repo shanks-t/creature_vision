@@ -40,8 +40,15 @@ storage_client = storage.Client(project="creature-vision")
 data_bucket_name = 'creature-vision-training-set' 
 data_bucket = storage_client.bucket(data_bucket_name)
 
-# Load the pre-trained MobileNetV2 model
-model = load_model("./mobile_net_v3_small.keras")
+
+model_version = os.getenv('MODEL_VERSION')
+print(f"model version: {model_version}")
+if model_version is None:
+    raise ValueError("MODEL_VERSION environment variable is not set")
+# model_name = "m_net_" + model_version
+
+# Load the pre-trained MobileNetV3 model
+model = load_model("./model.keras")
 
 def insert_prediction_data(actual, predicted, is_correct, latency, confidence):
     dataset_id = "dog_prediction_app"
@@ -55,7 +62,8 @@ def insert_prediction_data(actual, predicted, is_correct, latency, confidence):
         "predicted": predicted,
         "is_correct": is_correct,
         "latency": latency,
-        "confidence": confidence
+        "confidence": confidence,
+        "model_version": model_version
     }]
 
     errors = bigquery_client.insert_rows(table, rows_to_insert)
@@ -169,6 +177,7 @@ def run_prediction():
         latency = time.time() - start_time 
         
         result = {
+            'model_version': model_version,
             'is_correct': is_correct,
             'actual': api_label,
             'predicted': model_label,
@@ -181,6 +190,7 @@ def run_prediction():
         insert_prediction_data(api_label, model_label, is_correct, latency, confidence)
         
         logger.info("Prediction made",
+                    model_version=model_version,
                     actual=api_label,
                     predicted=model_label,
                     is_correct=is_correct,
