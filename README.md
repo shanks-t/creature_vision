@@ -1,110 +1,58 @@
-1. Local Development and Testing:[✅]
-   - Continue developing and testing your Python app locally.
-   - Run Prometheus in a container to collect metrics from your app.
-   - Add Grafana as a container to visualize metrics.
-   - Use Docker Compose to manage these containers locally.
+# Continuous Retraining Project
 
-2. Containerize Everything:[✅]
-   - Ensure your Python app, Prometheus, and Grafana are all containerized.
-   - Test the entire stack using Docker Compose on your MacBook.
+This project demonstrates a 'data flywheel' effect using a simulated user interaction system with a machine learning model. It leverages various technologies to create a continuous learning and improvement cycle.
 
-3. Kubernetes Basics:
-   - Install minikube or kind on your MacBook to create a local Kubernetes cluster.
-   - Learn Kubernetes basics: pods, services, deployments, configmaps, etc.
+## Overview
 
-4. Migrate to Local Kubernetes:
-   - Convert your Docker Compose setup to Kubernetes manifests.
-   - Deploy your app, Prometheus, and Grafana to your local Kubernetes cluster.
-   - Test thoroughly in this environment.
+The Continuous Retraining Project uses the free Dog API to simulate user interactions, feeding data into a containerized MobileNetV3 model running on Cloud Run. The system collects performance metrics and new training data, enabling continuous model improvement.
 
-5. Set Up Homelab:
-   - Install Proxmox on your homelab server if not already done.
-   - Create VMs for your Kubernetes nodes (master and workers).
+## Key Features
 
-6. Install Kubernetes in Homelab:
-   - Set up a Kubernetes cluster on your Proxmox VMs.
-   - Options include kubeadm, k3s, or a distribution like Rancher.
+- **Simulated User Interactions**: Utilizes the free Dog API to generate realistic user interaction data.
+- **Containerized ML Model**: Runs a lightweight MobileNetV3 model in a container on Cloud Run for efficient and scalable predictions.
+- **Performance Tracking**: Outputs model performance metrics to BigQuery for detailed analysis.
+- **Metric Visualization**: Integrates with Grafana using a BigQuery data source to visualize model performance over time.
+- **Automated Data Collection**: Saves new training data (images and labels) from the Dog API for future model fine-tuning.
+- **Threshold-based Retraining**: Initiates model fine-tuning once a specified volume of new training data is accumulated.
 
-7. Deploy to Homelab Kubernetes:
-   - Push your container images to a container registry (e.g., Docker Hub).
-   - Apply your Kubernetes manifests to your homelab cluster.
-   - Test and verify everything is working as expected.
+## Architecture
 
-8. Implement CI/CD:
-   - Set up a CI/CD pipeline to automate deployments to your homelab cluster.
+1. **Data Source**: Free Dog API
+2. **Model Hosting**: Cloud Run (containerized MobileNetV3)
+3. **Metric Storage**: BigQuery
+4. **Visualization**: Grafana
+5. **Data Storage**: Cloud Storage (for new training data)
 
-9. Monitoring and Management:
-   - Implement cluster-wide monitoring and logging solutions.
-   - Set up backup and disaster recovery processes.
+## Workflow
 
-### Configure Internal Network
-- use dedicated network for K8s nodes
+1. The system fetches dog images and labels from the Dog API.
+2. These images are sent to the MobileNetV3 model hosted on Cloud Run for prediction.
+3. Prediction results and actual labels are compared to generate performance metrics.
+4. Metrics are stored in BigQuery for analysis.
+5. Grafana visualizes the performance metrics from BigQuery.
+6. New images and labels are saved to Cloud Storage for future model fine-tuning.
+7. When the volume of new data reaches a predefined threshold, the model is retrained to improve its performance.
 
-1. Start a new shell session on your Proxmox VE server and switch to the Root shell if you haven’t already
-    ```
-    sudo -i
-    ```
-2. Take a backup of the network configuration file /etc/network/interfaces.
-    ```
-   cp /etc/network/interfaces /etc/network/interfaces.original
-    ```
-3. Open the /etc/network/interfaces file in a text editor and append the below configuration for the new network vmbr1.
-    ```
-   # /etc/network/interfaces
-    ...
-    ...
-    # Dedicated internal network for Kubernetes cluster
-    auto vmbr1
-    iface vmbr1 inet static
-        address  10.0.1.1/24
-        bridge-ports none
-        bridge-stp off
-        bridge-fd 0
+## Getting Started
 
-        post-up   echo 1 > /proc/sys/net/ipv4/ip_forward
-        post-up   iptables -t nat -A POSTROUTING -s '10.0.1.0/24' -o vmbr0 -j MASQUERADE
-        post-down iptables -t nat -D POSTROUTING -s '10.0.1.0/24' -o vmbr0 -j MASQUERADE
-    ```
+(Include instructions for setting up and running the project)
 
-### Prepare VM Template
-- https://austinsnerdythings.com/2021/08/30/how-to-create-a-proxmox-ubuntu-cloud-init-image/
+## Dependencies
 
-1. Run script to setup template:
-    ```
-    bash -c "$(wget qLO - https://raw.githubusercontent.com/shanks-t/creature_vision/refs/heads/main/scripts/create-vm-templ.sh)"
-    ```
+(List main dependencies and technologies used)
 
-### Generate SSH key pair
+## Configuration
 
-1. Generate an SSH key pair and save it to the specified directory.
-    ```
-    ssh-keygen -t rsa -b 4096 -f ~/proxmox-kubernetes/ssh-keys/id_rsa -C "k8s-admin@cluster.local"
-    ```
+(Explain any configuration steps or environment variables needed)
 
-### Setup bastion host
+## Usage
 
-1. Create a new VM by cloning the VM template we’ve just created.
-    ```
-    qm clone 800 801 --name bastion --full true
-    ```
-2. Configure SSH keys for bastion user authentication.
-    ```
-    qm set 801 --sshkey ~/proxmox-kubernetes/ssh-keys/id_rsa.pub
-    ```
-3. Plug the bastion VM into the LAN network by setting the appropriate IP and gateway configuration. Replace 192.168.1.131 with your desired IP.
-    ```
-    qm set 801 --net0 virtio,bridge=vmbr0 --ipconfig0 ip=10.0.0.100/24,gw=10.0.0.1
-    ```
-4. Connect the bastion VM to the Kubernetes internal network bridge vmbr1.
-    ```
-    qm set 801 --net1 virtio,bridge=vmbr1 --ipconfig1 ip=10.0.1.2/24,gw=10.0.1.1
-    ```
-5. Configure the bastion VM to start at boot.
-    ```
-    qm set 801 --onboot 1
-    ```
-6. Start the bastion VM.
-    ```
-    qm start 801
-    ```
+(Provide examples or instructions on how to use the system)
 
+## Contributing
+
+(Guidelines for contributing to the project)
+
+## License
+
+(Specify the license under which this project is released)
