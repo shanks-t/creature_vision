@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: BigQuery
+    type: grafana-bigquery-datasource
+    editable: true
+    enabled: true
+    isDefault: true
+    jsonData:
+      authenticationType: jwt
+      defaultProject: creature-vision 
+      queryTimeout: "60s"
+      tokenUri: https://oauth2.googleapis.com/token
+      clientEmail: grafana-bq-sa@creature-vision.iam.gserviceaccount.com
+      privateKeyPath: '/etc/grafana/bigquery.pem'

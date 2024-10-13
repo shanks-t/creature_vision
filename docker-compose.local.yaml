@@ -1,0 +1,24 @@
+services:
+  dog-prediction-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BUILDPLATFORM=linux/arm64
+        - TARGETARCH=arm64
+        - MODEL_VERSION=${VERSION}
+    image: dog-prediction-app:local
+    platform: linux/arm64
+    ports:
+      - "8080:8080"
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud
+    environment:
+      # Set the environment variable for authentication
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - MODEL_VERSION=${VERSION}
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
