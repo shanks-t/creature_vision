@@ -17,7 +17,7 @@ The Continuous Retraining Project uses the free Dog API to simulate user interac
 
 ## Architecture
 
-1. **Data Source**: Free Dog API
+1. **Data Source**: [Free Dog API](https://dog.ceo/dog-api/about)
 2. **Model Hosting**: Cloud Run (containerized MobileNetV3)
 3. **Metric Storage**: BigQuery
 4. **Visualization**: Grafana
