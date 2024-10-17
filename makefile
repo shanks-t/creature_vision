@@ -13,9 +13,6 @@ run_docker_local:
 	docker-compose -f docker-compose.local.yaml build --build-arg VERSION=$(VERSION)
 	docker-compose -f docker-compose.local.yaml up
 
-cloud_run_delete:
-	gcloud run services delete ner-app --region=us-east1 -q
-
 create_bq_table:
 	bq mk \
   --table \
@@ -63,3 +60,6 @@ run_local:
 	gcr.io/creature-vision/dog-prediction-app
 
 	us-east1-docker.pkg.dev/creature-vision/dog-prediction-app
+	
+run_monitoring:
+	docker compose -f docker-compose.grafana.yaml up

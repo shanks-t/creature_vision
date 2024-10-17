@@ -35,24 +35,9 @@ The Continuous Retraining Project uses the free Dog API to simulate user interac
 
 ## Getting Started
 
-(Include instructions for setting up and running the project)
+TODO: (Include instructions for setting up and running the project)
 
-## Dependencies
-
-(List main dependencies and technologies used)
-
-## Configuration
-
-(Explain any configuration steps or environment variables needed)
-
-## Usage
-
-(Provide examples or instructions on how to use the system)
-
-## Contributing
-
-(Guidelines for contributing to the project)
-
-## License
-
-(Specify the license under which this project is released)
+## Monitoring
+- Once your gcp service account key is created, downloaded to your host machine, you can mount the key to you grafana container
+- The dashboards and datasource configs are stored in grafana monitoring dir. mount these dirs as well, and the 'creature-vision' dashbpoard viz will automatically startup
+![accuracy](./docs/grafana.png)

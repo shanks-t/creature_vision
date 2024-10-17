@@ -12,8 +12,8 @@ services:
       - GF_INSTALL_PLUGINS=grafana-bigquery-datasource
     volumes:
       - grafana-storage:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/provisioning/dashboards:/etc/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/dashboards
       - ~/.gcp/secrets/bigquery.pem:/etc/grafana/bigquery.pem:ro
     restart: always
 
