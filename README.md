@@ -44,4 +44,4 @@ TODO: (Include instructions for setting up and running the project)
 
 
 ## Fine-tuning
-- [augmentation: https://www.tensorflow.org/api_docs/python/tf/keras/preprocessing/image/ImageDataGenerator](https://www.tensorflow.org/tutorials/images/transfer_learning)
+- https://www.tensorflow.org/tutorials/images/transfer_learning
