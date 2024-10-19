@@ -13,12 +13,12 @@ run_docker_local:
 	docker-compose -f docker-compose.local.yaml build --build-arg VERSION=$(VERSION)
 	docker-compose -f docker-compose.local.yaml up
 
-create_bq_table:
+create_bq_table_tuning:
 	bq mk \
   --table \
-  --description="Table to store prediction metrics for the dog breed classifier" \
-  creature-vision:dog_prediction_app.prediction_metrics \
-  timestamp:TIMESTAMP,actual:STRING,predicted:STRING,is_correct:BOOLEAN,latency:FLOAT
+  --description="Table to store validation metrics for new model tuning" \
+  creature-vision:dog_prediction_app.tuning_metrics \
+  timestamp:TIMESTAMP,model_version:STRING,val_accuracy:FLOAT,loss:FLOAT,val_loss:FLOAT,training_duration:FLOAT,confusion_matrix:STRING,precision:FLOAT,recall:FLOAT,f1_score:FLOAT,class_distribution:STRING,learning_rate:FLOAT,hyperparams:STRING
 
 create_bq_dataset:
 	bq mk --dataset \

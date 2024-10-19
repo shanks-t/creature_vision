@@ -41,3 +41,7 @@ TODO: (Include instructions for setting up and running the project)
 - Once your gcp service account key is created, downloaded to your host machine, you can mount the key to you grafana container
 - The dashboards and datasource configs are stored in grafana monitoring dir. mount these dirs as well, and the 'creature-vision' dashbpoard viz will automatically startup
 ![accuracy](./docs/grafana.png)
+
+
+## Fine-tuning
+- [augmentation: https://www.tensorflow.org/api_docs/python/tf/keras/preprocessing/image/ImageDataGenerator](https://www.tensorflow.org/tutorials/images/transfer_learning)
