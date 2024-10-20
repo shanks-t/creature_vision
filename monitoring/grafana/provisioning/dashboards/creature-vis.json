@@ -18,9 +18,145 @@
     "editable": true,
     "fiscalYearStartMonth": 0,
     "graphTooltip": 0,
-    "id": 3,
+    "id": 1,
     "links": [],
     "panels": [
+        {
+            "datasource": {
+                "default": true,
+                "type": "grafana-bigquery-datasource",
+                "uid": "P0871A590F805E5CD"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisGridShow": true,
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "fillOpacity": 80,
+                        "gradientMode": "opacity",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 1,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "fieldMinMax": false,
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "12"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "red",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+            },
+            "id": 3,
+            "options": {
+                "barRadius": 0.2,
+                "barWidth": 0.67,
+                "colorByField": "actual_count",
+                "fullHighlight": true,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": false
+                },
+                "orientation": "auto",
+                "showValue": "auto",
+                "stacking": "none",
+                "text": {
+                    "valueSize": 3
+                },
+                "tooltip": {
+                    "mode": "single",
+                    "sort": "none"
+                },
+                "xField": "actual",
+                "xTickLabelRotation": -60,
+                "xTickLabelSpacing": 0
+            },
+            "pluginVersion": "11.2.2+security-01",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "grafana-bigquery-datasource",
+                        "uid": "P0871A590F805E5CD"
+                    },
+                    "editorMode": "code",
+                    "format": 1,
+                    "location": "",
+                    "project": "creature-vision",
+                    "rawQuery": true,
+                    "rawSql": "select count(actual) as actual_count, actual from `creature-vision.dog_prediction_app.prediction_metrics`\nwhere is_correct = false\ngroup by actual\norder by actual_count desc\nLIMIT 25;\n",
+                    "refId": "A",
+                    "sql": {
+                        "columns": [
+                            {
+                                "parameters": [],
+                                "type": "function"
+                            }
+                        ],
+                        "groupBy": [
+                            {
+                                "property": {
+                                    "type": "string"
+                                },
+                                "type": "groupBy"
+                            }
+                        ],
+                        "limit": 50
+                    }
+                }
+            ],
+            "title": "Top Misclassified Dog Breeds $model_version",
+            "type": "barchart"
+        },
         {
             "datasource": {
                 "default": true,
@@ -52,7 +188,7 @@
             "gridPos": {
                 "h": 8,
                 "w": 12,
-                "x": 0,
+                "x": 12,
                 "y": 0
             },
             "id": 2,
@@ -73,7 +209,7 @@
                 "textMode": "auto",
                 "wideLayout": true
             },
-            "pluginVersion": "11.2.0",
+            "pluginVersion": "11.2.2+security-01",
             "targets": [
                 {
                     "datasource": {
@@ -174,8 +310,8 @@
                 "overrides": []
             },
             "gridPos": {
-                "h": 8,
-                "w": 12,
+                "h": 10,
+                "w": 24,
                 "x": 0,
                 "y": 8
             },
@@ -236,7 +372,7 @@
         "list": [
             {
                 "current": {
-                    "selected": true,
+                    "selected": false,
                     "text": "v3.0",
                     "value": "v3.0"
                 },
@@ -285,13 +421,13 @@
         ]
     },
     "time": {
-        "from": "now-2d",
+        "from": "now-7d",
         "to": "now"
     },
     "timepicker": {},
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 8,
+    "version": 6,
     "weekStart": ""
 }
