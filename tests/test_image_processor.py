@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from PIL import Image
 from pathlib import Path
-from preprocessing.image_processor import ImageProcessor
+from src.preprocessing.image_processor import ImageProcessor
 import tensorflow as tf
 
 

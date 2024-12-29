@@ -9,13 +9,13 @@ ENV MODEL_VERSION=${MODEL_VERSION}
 
 WORKDIR /app
 
-COPY app/requirements.txt .
+COPY ../../src/inference/requirements.txt .
 RUN pip install --trusted-host pypi.python.org -r requirements.txt
 
 # Copy the model with a fixed name
-COPY ./model.keras /app/model.keras
+COPY ../../models/m_net_v3.0.keras /app/model.keras
 
-COPY /app/main.py ./app/
+COPY ../../src/inference/main.py ./app/
 
 # Run app.py when the container launches
 CMD ["python", "app/main.py"]

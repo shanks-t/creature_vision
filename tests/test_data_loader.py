@@ -30,7 +30,7 @@ def mock_gcs_client(mocker):
 
 def test_load_single_sample(mock_gcs_client):
     """Test loading a single image and label"""
-    from preprocessing.data_loader import GCSDataLoader
+    from src.preprocessing.data_loader import GCSDataLoader
 
     _, mock_bucket, mock_blob = mock_gcs_client
     loader = GCSDataLoader('test-bucket')

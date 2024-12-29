@@ -1,7 +1,7 @@
 # tests/test_label_processor.py
 import pytest
 from pathlib import Path
-from preprocessing.label_processor import LabelProcessor
+from src.preprocessing.label_processor import LabelProcessor
 
 
 class TestLabelProcessor:

@@ -30,7 +30,7 @@ copy_to_gcs: $(model)
 	gsutil -m cp $(model) gs://tf_models_cv/$(model)
 
 copy_model_from_gcs:
-	gsutil cp gs://tf_models_cv/m_net_$(VERSION).keras ./model.keras
+	gsutil cp gs://tf_models_cv/m_net_$(VERSION).keras ./models/m_net_$(VERSION).keras
 
 build_docker_cloud:
 	VERSION=$(VERSION) docker-compose -f docker-compose.cloud.yaml build

@@ -1,5 +1,5 @@
-from training.model import create_model
-from training.model import save_model
+from src.training.model import create_model
+from src.training.model import save_model
 import os
 
 

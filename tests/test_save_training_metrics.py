@@ -1,4 +1,4 @@
-from training.model import save_model_training_metrics
+from src.training.model import save_model_training_metrics
 
 
 def test_save_training_metrics(mocker):
