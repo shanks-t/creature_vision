@@ -5,12 +5,13 @@ class LabelProcessor:
     def __init__(self):
         self.label_mapping = {}  # To store unique labels and their indices
 
-    def process_label(self, label_path):
-        with open(label_path, 'r') as f:
-            label_data = json.load(f)
-
-        # Extract the actual label (assuming it's stored in 'api_label')
-        actual_label = label_data['api_label']
+    def process_label(self, label_input):
+        if isinstance(label_input, dict):
+            actual_label = label_input['api_label']
+        else:
+            with open(label_input, 'r') as f:
+                label_data = json.load(f)
+                actual_label = label_data['api_label']
 
         # Map the label to a numeric index if it's not already in our mapping
         if actual_label not in self.label_mapping:
