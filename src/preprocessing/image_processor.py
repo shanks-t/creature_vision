@@ -2,7 +2,6 @@
 import numpy as np
 from PIL import Image
 import tensorflow as tf
-from tensorflow.keras.applications.mobilenet_v3 import preprocess_input
 
 
 class ImageProcessor:
@@ -25,9 +24,6 @@ class ImageProcessor:
 
         # Convert to float32
         images = tf.cast(images, tf.float32)
-
-        # Rescale values to [0, 1]
-        images = tf.keras.layers.Rescaling(1./255)(images)
 
         return images
 

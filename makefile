@@ -43,8 +43,8 @@ push_to_registry:
 	docker push ${IMAGE_TAG}
 
 cloud_run_deploy:
-	gcloud run deploy dog-prediction-app --image=${IMAGE_TAG} --max-instances=2 --min-instances=0 --port=8080 \
- 	--region=us-east1 --memory=2Gi -q
+	gcloud run deploy dog-prediction-app --image=${IMAGE_TAG} --max-instances=1 --min-instances=0 --port=8080 \
+ 	--region=us-east1 --memory=2Gi --allow-unauthenticated -q
 
 deploy_model:
 	# make copy_model_from_gcs VERSION=$(VERSION)
