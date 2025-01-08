@@ -6,7 +6,7 @@ import numpy as np
 
 def main():
     BUCKET_NAME = "creature-vision-training-set"
-    NUM_EXAMPLES = 32
+    NUM_EXAMPLES = 320
     BATCH_SIZE = 32
 
     # # Create dataset

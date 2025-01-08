@@ -7,6 +7,7 @@ from collections import Counter
 from src.training.monitor import *
 import matplotlib.pyplot as plt
 import numpy as np
+from tensorflow.keras.metrics import F1Score
 
 
 def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.keras.Model:
@@ -88,8 +89,7 @@ def evaluate_base_model(val_ds: tf.data.Dataset,
     model.compile(
         optimizer='adam',
         loss='sparse_categorical_crossentropy',
-        metrics=['accuracy', 'sparse_categorical_accuracy',
-                 'sparse_top_k_categorical_accuracy']
+        metrics=['accuracy', 'sparse_categorical_accuracy']
     )
 
     # Evaluate
