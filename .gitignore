@@ -208,3 +208,5 @@ data/
 mobile_net_v3_small.keras
 
 *.keras
+
+models
