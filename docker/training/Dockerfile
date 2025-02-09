@@ -12,6 +12,8 @@ WORKDIR /app
 COPY ../../src/training/requirements.txt .
 RUN pip install --trusted-host pypi.python.org -r requirements.txt
 
+COPY ../../src/preprocessing src/preprocessing/
+
 COPY ../../src/training src/training/
 
 ENV PYTHONPATH="/app/src:${PYTHONPATH}"

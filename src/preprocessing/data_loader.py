@@ -10,7 +10,7 @@ import random
 class GCSDataLoader:
     def __init__(self, bucket_name: str):
         self.bucket_name = bucket_name
-        self.client = storage.Client()
+        self.client = storage.Client(project="creature-vision")
         self.bucket = self.client.bucket(self.bucket_name)
 
     def _load_raw_sample(self, image_path: str, label_path: str):
