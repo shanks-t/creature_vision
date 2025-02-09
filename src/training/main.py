@@ -7,7 +7,7 @@ def main():
     BUCKET_NAME = "creature-vision-training-set"
     NUM_EXAMPLES = 32
     BATCH_SIZE = 8
-    VERSION = f"v1_{datetime.datetime.now().strftime('%Y%m%d')}"
+    VERSION = f"v1_{datetime.datetime.now().strftime('%b_%d_%Y')}"
 
     # Create dataset
     train_ds, val_ds, num_classes, class_names = create_training_dataset(
@@ -24,7 +24,8 @@ def main():
     )
 
     # save fine-tuned model to gcs
-    save_model(model, class_names, version=VERSION, bucket_name="tf_models_cv")
+    save_model(model, version=VERSION, bucket_name="tf_models_cv",
+               class_names=class_names)
 
 
 if __name__ == "__main__":

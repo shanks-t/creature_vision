@@ -77,8 +77,7 @@ def load_random_dog_image():
         img = Image.open(BytesIO(img_response.content))
         img = img.convert('RGB')
         # Resize to match training input shape
-        input_shape = metadata['input_shape']
-        img = img.resize((input_shape[1], input_shape[0]))
+        img = img.resize((224, 224))
 
         # Convert to array and add batch dimension
         img_array = np.array(img)
@@ -89,9 +88,6 @@ def load_random_dog_image():
             img_array)
 
         print(f"breed from api: {breed}")
-        return img_array, img, breed
-        print(f"breed from api: {breed}")
-
         return img_array, img, breed
 
     except requests.exceptions.RequestException as e:
@@ -137,14 +133,12 @@ def predict_breed(model: tf.keras.Model, img_array: np.ndarray, metadata: dict) 
 
 # Initialize model and metadata globally
 try:
-    # model_version = os.getenv('MODEL_VERSION')
-    model_version = "v1_20250208"
+    model_version = os.getenv('MODEL_VERSION')
     if not model_version:
         raise ValueError("MODEL_VERSION environment variable not set")
     model, metadata = load_model(model_version)
     logger.info("Model loaded successfully",
-                version=model_version,
-                input_shape=metadata['input_shape'])
+                version=model_version)
 except Exception as e:
     logger.error("Failed to load model", error=str(e))
     raise

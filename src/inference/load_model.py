@@ -1,49 +1,73 @@
-from google.cloud import storage
-import tensorflow as tf
-import json
 import os
+import json
+import tensorflow as tf
+from google.cloud import storage
+import logging
 
 
-def load_model(
-    version: str,
-    bucket_name: str = "tf_models_cv"
-) -> tuple[tf.keras.Model, dict]:
+def load_model(version: str, bucket_name: str = "tf_models_cv") -> tuple[tf.keras.Model, dict]:
     """
-    Loads model and metadata from GCS bucket.
+    Loads model and metadata from a GCS bucket.
 
     Args:
-        version: Model version to load
-        bucket_name: GCS bucket name
+        version: Model version to load (also serves as the folder name in GCS).
+        bucket_name: Name of the GCS bucket.
+
     Returns:
-        Tuple of (loaded model, metadata dict)
+        Tuple of (loaded model, metadata dict).
     """
-    model_dir = f"./models/{version}"
+    # Create a local directory for this model version.
+    model_dir = f"./model"
     os.makedirs(model_dir, exist_ok=True)
 
-    # Download from GCS
-    storage_client = storage.Client()
+    # Set up the GCS client.
+    storage_client = storage.Client(project="creature-vision")
     bucket = storage_client.bucket(bucket_name)
 
-    # Download model
-    model_blob = bucket.blob(f"{version}/model.keras")
-    model_path = f"{model_dir}/model.keras"
-    model_blob.download_to_filename(model_path)
+    # Define local paths for the model and metadata.
+    model_file = f"{version}.keras"
+    metadata_file = "metadata.json"
+    model_path = os.path.join(model_dir, model_file)
+    metadata_path = os.path.join(model_dir, metadata_file)
 
-    # Download metadata
-    metadata_blob = bucket.blob(f"{version}/metadata.json")
-    metadata_path = f"{model_dir}/metadata.json"
-    metadata_blob.download_to_filename(metadata_path)
+    try:
+        # Download the model file from GCS.
+        model_blob = bucket.blob(f"{version}/{model_file}")
+        logging.info(
+            f"Downloading model from gs://{bucket_name}/{version}/{model_file} to {model_path}.")
+        model_blob.download_to_filename(model_path)
+    except Exception as e:
+        logging.error(f"Failed to download model: {e}")
+        raise
 
-    # Load metadata
-    with open(metadata_path) as f:
-        metadata = json.load(f)
+    try:
+        # Download the metadata file from GCS.
+        metadata_blob = bucket.blob(f"{version}/{metadata_file}")
+        logging.info(
+            f"Downloading metadata from gs://{bucket_name}/{version}/{metadata_file} to {metadata_path}.")
+        metadata_blob.download_to_filename(metadata_path)
+    except Exception as e:
+        logging.error(f"Failed to download metadata: {e}")
+        raise
 
-    # Load model with custom objects
-    model = tf.keras.models.load_model(
-        model_path,
-        custom_objects={
-            'preprocess_input': tf.keras.applications.mobilenet_v3.preprocess_input
-        }
-    )
+    # Load metadata from the JSON file.
+    try:
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+    except Exception as e:
+        logging.error(f"Error loading metadata from {metadata_path}: {e}")
+        raise
 
+    # Load the model, including any custom objects required.
+    try:
+        model = tf.keras.models.load_model(
+            model_path,
+            custom_objects={
+                'preprocess_input': tf.keras.applications.mobilenet_v3.preprocess_input}
+        )
+    except Exception as e:
+        logging.error(f"Error loading model from {model_path}: {e}")
+        raise
+
+    logging.info("Model and metadata loaded successfully.")
     return model, metadata
