@@ -1,0 +1,4 @@
+- containerize inference app
+- test locally with loading model from gcs
+- decide where to run training service
+- how to autmatically update the inference service with new model

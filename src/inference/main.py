@@ -11,6 +11,8 @@ import structlog
 from flask import Flask, jsonify
 from google.cloud import bigquery
 from datetime import datetime
+from .load_model import load_model
+
 
 structlog.configure(
     processors=[
@@ -74,11 +76,20 @@ def load_random_dog_image():
         img_response.raise_for_status()
         img = Image.open(BytesIO(img_response.content))
         img = img.convert('RGB')
-        img = img.resize((224, 224))
+        # Resize to match training input shape
+        input_shape = metadata['input_shape']
+        img = img.resize((input_shape[1], input_shape[0]))
 
+        # Convert to array and add batch dimension
         img_array = np.array(img)
         img_array = np.expand_dims(img_array, axis=0)
-        img_array = preprocess_input(img_array)
+
+        # Apply MobileNetV3 preprocessing
+        img_array = tf.keras.applications.mobilenet_v3.preprocess_input(
+            img_array)
+
+        print(f"breed from api: {breed}")
+        return img_array, img, breed
         print(f"breed from api: {breed}")
 
         return img_array, img, breed
@@ -125,8 +136,18 @@ def predict_breed(model: tf.keras.Model, img_array: np.ndarray, metadata: dict) 
 
 
 # Initialize model and metadata globally
-model_version = os.getenv('MODEL_VERSION')
-model, metadata = load_model(model_version)
+try:
+    # model_version = os.getenv('MODEL_VERSION')
+    model_version = "v1_20250208"
+    if not model_version:
+        raise ValueError("MODEL_VERSION environment variable not set")
+    model, metadata = load_model(model_version)
+    logger.info("Model loaded successfully",
+                version=model_version,
+                input_shape=metadata['input_shape'])
+except Exception as e:
+    logger.error("Failed to load model", error=str(e))
+    raise
 
 
 @app.route('/predict/', methods=['GET'])
@@ -178,9 +199,5 @@ def health_check():
 
 
 if __name__ == "__main__":
-    if tf.test.is_built_with_cuda():
-        print("GPU acceleration enabled")
-    else:
-        print("Running on CPU or Metal")
 
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
