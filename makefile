@@ -10,8 +10,8 @@ build_docker:
 	docker build . -t ${APP_NAME}:latest -t ${APP_NAME}:${VERSION}
 
 run_docker_local:
-	docker-compose -f docker-compose.local.yaml build --build-arg VERSION=$(VERSION)
-	docker-compose -f docker-compose.local.yaml up
+	docker-compose -f docker/$(service)/docker-compose.local.yaml build --build-arg VERSION=$(VERSION)
+	docker-compose -f docker/$(service)/docker-compose.local.yaml up
 
 create_bq_table_tuning:
 	bq mk \
@@ -26,20 +26,14 @@ create_bq_dataset:
 	--location=US \
 	creature-vision:dog_prediction_app
 
-copy_to_gcs: $(model)
-	gsutil -m cp $(model) gs://tf_models_cv/$(model)
-
-copy_model_from_gcs:
-	gsutil cp gs://tf_models_cv/m_net_$(VERSION).keras ./models/m_net_$(VERSION).keras
-
 build_docker_cloud:
-	VERSION=$(VERSION) docker-compose -f docker-compose.cloud.yaml build
+	VERSION=$(VERSION) docker-compose -f docker/$(service)/docker-compose.cloud.yaml build
 
 auth_to_registry:
 	gcloud auth configure-docker us-east1-docker.pkg.dev
 
 push_to_registry:
-	docker tag ${PROJECT_ID}/${APP_NAME}:${VERSION} ${IMAGE_TAG}
+	docker tag ${PROJECT_ID}/${APP_NAME}-$(service):${VERSION} ${IMAGE_TAG}
 	docker push ${IMAGE_TAG}
 
 cloud_run_deploy:
@@ -54,7 +48,6 @@ deploy_model:
 	make cloud_run_deploy VERSION=$(VERSION)
 
 run_local:
-	make copy_model_from_gcs VERSION=$(VERSION)
 	make run_docker_local VERSION=$(VERSION)
 
 	gcr.io/creature-vision/dog-prediction-app
