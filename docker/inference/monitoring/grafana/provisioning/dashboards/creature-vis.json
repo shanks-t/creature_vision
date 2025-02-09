@@ -133,7 +133,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "select count(actual) as actual_count, actual from `creature-vision.dog_prediction_app.prediction_metrics`\nwhere is_correct = false\ngroup by actual\norder by actual_count desc\nLIMIT 25;\n",
+                    "rawSql": "select count(actual) as actual_count, actual from `creature-vision.dog_prediction_app.prediction_metrics`\nwhere is_correct = false\nand model_version = '${model_version}'\ngroup by actual\norder by actual_count desc\nLIMIT 25;\n",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -221,7 +221,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  AVG(CAST(is_correct AS INT64)) AS avg_prediction_accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\n",
+                    "rawSql": "SELECT\n  AVG(CAST(is_correct AS INT64)) AS avg_prediction_accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\nWHERE model_version = '${model_version}'",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -340,7 +340,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, HOUR) AS time_bucket,\n  AVG(CAST(is_correct AS INT64)) AS accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\nWHERE\n  timestamp BETWEEN TIMESTAMP('${__from:date}') AND TIMESTAMP('${__to:date}')\nGROUP BY\n  time_bucket\nORDER BY\n  time_bucket",
+                    "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, HOUR) AS time_bucket,\n  AVG(CAST(is_correct AS INT64)) AS accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\nWHERE\n  timestamp BETWEEN TIMESTAMP('${__from:date}') AND TIMESTAMP('${__to:date}')\n  and model_version = '${model_version}'\nGROUP BY\n  time_bucket\nORDER BY\n  time_bucket",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -372,9 +372,9 @@
         "list": [
             {
                 "current": {
-                    "selected": false,
-                    "text": "v3.0",
-                    "value": "v3.0"
+                    "selected": true,
+                    "text": "v1_Feb_09_2025",
+                    "value": "v1_Feb_09_2025"
                 },
                 "datasource": {
                     "type": "grafana-bigquery-datasource",
@@ -392,7 +392,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "SELECT model_version\nFROM `dog_prediction_app.prediction_metrics`\nWHERE timestamp BETWEEN TIMESTAMP('${__from:date}') AND TIMESTAMP('${__to:date}')\nORDER BY timestamp DESC\nLIMIT 1",
+                    "rawSql": "SELECT DISTINCT\n  model_version AS __text,\n  model_version AS __value\nFROM\n  `dog_prediction_app.prediction_metrics`\nORDER BY\n  model_version\n",
                     "refId": "tempvar",
                     "sql": {
                         "columns": [
@@ -421,13 +421,13 @@
         ]
     },
     "time": {
-        "from": "now-7d",
+        "from": "now-12h",
         "to": "now"
     },
     "timepicker": {},
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 6,
+    "version": 13,
     "weekStart": ""
 }
