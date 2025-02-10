@@ -1,11 +1,11 @@
 ## TODO
 
-### Inference
-- do I d/l the model from gcs when i build the image, or d/l the model inside my app when it starts up?
-- how do I redeploy new model image in cloud run service, after train and val  pipeline completes
+- containerize inference app
+- test locally with loading model from gcs
+- decide where to run training service
+- how to autmatically update the inference service with new model
+- does the fine-tuned model need to be created as 'trainable' for the next tuning run?
 
-### Training
-- how can I configure vertex ai to be cost effective? 
-- containerize train pipeline and test locally
-- deploy to vertex ai
-- review model performance and tweak architecture if poor
+### Ideas
+- Convert the images to TFRecords and store them in a Cloud Storage bucket. Read the TFRecords by using the tf.data.TFRecordDataset function.
+
