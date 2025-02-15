@@ -15,6 +15,11 @@ resource "google_container_cluster" "primary" {
   # Network configuration
   network    = google_compute_network.vpc.name
   subnetwork = google_compute_subnetwork.subnet.name
+
+  depends_on = [
+    google_compute_network.vpc,
+    google_compute_subnetwork.subnet
+  ]
 }
 
 resource "google_container_node_pool" "primary_nodes" {
@@ -46,4 +51,8 @@ resource "google_container_node_pool" "primary_nodes" {
       mode = "GKE_METADATA"
     }
   }
+
+  depends_on = [
+    google_container_cluster.primary
+  ]
 }

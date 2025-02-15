@@ -26,4 +26,8 @@ resource "google_service_account_iam_member" "workload_identity_user" {
   service_account_id = google_service_account.vertex_sa.name
   role               = "roles/iam.workloadIdentityUser"
   member             = "serviceAccount:${var.project_id}.svc.id.goog[default/vertex-k8s-sa]"
+
+  depends_on = [
+    google_container_cluster.primary
+  ]
 }
