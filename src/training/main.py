@@ -1,4 +1,4 @@
-from .model import train_model, create_model, save_model
+from .model import train_model, load_or_create_model, save_model
 from .dataset import create_training_dataset
 import datetime
 
@@ -8,6 +8,7 @@ def main():
     NUM_EXAMPLES = 32
     BATCH_SIZE = 8
     VERSION = f"v1_{datetime.datetime.now().strftime('%b_%d_%Y')}"
+    model_gcs_path = "gs://tf_models_cv/v1_Feb_15_2025/v1_Feb_09_2025.keras"
 
     # Create dataset
     train_ds, val_ds, num_classes, class_names = create_training_dataset(
@@ -17,7 +18,7 @@ def main():
     )
 
     # Create and train model
-    model = create_model(num_classes)
+    model = load_or_create_model(num_classes, model_gcs_path)
 
     train_model(
         model, train_ds, val_ds, class_names
