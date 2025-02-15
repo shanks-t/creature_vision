@@ -19,3 +19,7 @@ using Vertex Explainable AI to generate feature attributions. Aggregate feature 
 - can use dataflow for evalution using -runner=DataflowRunner in beam_pipeline_args
 
 - Configure example-based explanations. Specify the embedding output layer to be used for the latent space representation. Example-based explanations analyze model behavior by comparing a given input to examples from the dataset, which can reveal patterns in the mislabeled images. By specifying the embedding output layer for the latent space representation, you can visualize and understand how the model groups images based on learned features. This approach helps identify clusters of similar images, revealing potential biases or anomalies that contribute to high-confidence misclassifications.
+
+- Use Vertex Explainable AI to generate feature attributions. Aggregate feature attributions over the entire dataset. Analyze the aggregation result together with the standard model evaluation metrics. Aggregating feature attributions over the entire dataset allows you to identify patterns, such as which features consistently have a strong influence on the model's predictions. This aggregated view can help uncover potential biases or systemic issues in how the model processes different types of input data.
+
+- I can Chain the Vertex AI ModelUploadOp and ModelDeployOp components together to configure a pipeline to upload a new version of the a model to Vertex AI Model Registry and deploy it to Vertex AI Endpoints for online inference 
