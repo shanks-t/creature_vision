@@ -1,37 +1,58 @@
 from google.cloud import aiplatform
 import tensorflow as tf
 from typing import List
+from datetime import datetime
 
 
 class TrainingMetrics:
     def __init__(self, project_id: str, location: str, experiment_name: str):
-        # Initialize Vertex AI
+        # Initialize Vertex AI with default TensorBoard instance
         aiplatform.init(
             project=project_id,
-            location=location
+            location=location,
+            experiment=experiment_name
         )
 
-        # Create or get existing experiment
-        self.experiment = aiplatform.Experiment(experiment_name)
-
-        # Create TensorBoard instance
-        self.tensorboard = aiplatform.Tensorboard.create(
+        # Get or create experiment
+        self.experiment = aiplatform.Experiment.get_or_create(
             display_name=experiment_name,
-            project=project_id,
-            location=location
+            description="Transfer learning for image classification"
         )
+
+        # Start a new run
+        self.run = self.experiment.start_run(
+            run_name=f"run_{datetime.now().strftime('%Y%m%d_%H%M')}")
+
+        # Get the backing TensorBoard
+        self.tensorboard = self.experiment.get_backing_tensorboard_resource()
+
+    def log_metrics(self, metrics_dict: dict, step: int = None):
+        """Log metrics to Vertex AI experiment"""
+        self.run.log_metrics(metrics_dict, step=step)
 
     def get_metrics(self):
+        """Essential metrics for multiclass classification"""
         return [
-            'accuracy',
-            'sparse_top_k_categorical_accuracy',
-            tf.keras.metrics.SparseCategoricalAccuracy(
-                name='categorical_accuracy')
+            tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy'),
+            tf.keras.metrics.SparseTopKCategoricalAccuracy(
+                k=5, name='top_5_accuracy'),
+            tf.keras.metrics.SparseCategoricalCrossentropy(
+                name='cross_entropy')
         ]
 
     def create_callbacks(self):
+        """Create callbacks including custom metric logging"""
+        class VertexAICallback(tf.keras.callbacks.Callback):
+            def __init__(self, metrics_logger):
+                super().__init__()
+                self.metrics_logger = metrics_logger
+
+            def on_epoch_end(self, epoch, logs=None):
+                if logs:
+                    self.metrics_logger.log_metrics(logs, step=epoch)
+
         return [
-            # Use Vertex AI TensorBoard callback
+            VertexAICallback(self),
             tf.keras.callbacks.TensorBoard(
                 log_dir=self.tensorboard.log_dir,
                 histogram_freq=1,
@@ -49,7 +70,6 @@ class TrainingMetrics:
             )
         ]
 
-    def log_metric(self, name: str, value: float, step: int = None):
-        """Log custom metrics during training"""
-        with self.experiment.log_run("training") as run:
-            run.log_metric(name, value, step=step)
+    def end_run(self):
+        """End the current run"""
+        self.run.end()

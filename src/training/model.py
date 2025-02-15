@@ -14,24 +14,32 @@ def train_model(
     class_names: list,
     epochs: int = 20,
 ) -> tf.keras.Model:
-    """Single phase training with metrics tracking"""
-    log_dir = f"logs/training/{datetime.now().strftime('%Y%m%d-%H%M')}"
-    metrics = TrainingMetrics(log_dir=log_dir)
-
-    # Configure model for transfer learning
-    model.trainable = False
-
-    # Train with class weights
-    model = train_phase(
-        model=model,
-        train_ds=train_ds,
-        val_ds=val_ds,
-        epochs=epochs,
-        phase_name="Transfer Learning",
-        learning_rate=1e-3,
-        metrics=metrics,
-        class_weight=compute_class_weight(train_ds)
+    """Single phase training with Vertex AI metrics tracking"""
+    experiment_name = f"transfer-learning-{datetime.now().strftime('%Y%m%d-%H%M')}"
+    metrics = TrainingMetrics(
+        project_id="creature-vision",
+        location="us-central1",
+        experiment_name=experiment_name
     )
+
+    try:
+        # Configure model for transfer learning
+        model.trainable = False
+
+        # Train with class weights
+        model = train_phase(
+            model=model,
+            train_ds=train_ds,
+            val_ds=val_ds,
+            epochs=epochs,
+            phase_name="Transfer Learning",
+            learning_rate=1e-3,
+            metrics=metrics,
+            class_weight=compute_class_weight(train_ds)
+        )
+    finally:
+        # Ensure run is ended properly
+        metrics.end_run()
 
     return model
 
@@ -46,7 +54,7 @@ def train_phase(
     metrics: TrainingMetrics,
     class_weight: dict = None,
 ) -> tf.keras.callbacks.History:
-    """Training phase with integrated metric tracking"""
+    """Training phase with Vertex AI metric tracking"""
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate),
         loss='sparse_categorical_crossentropy',

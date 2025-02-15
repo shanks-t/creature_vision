@@ -8,7 +8,7 @@ def main():
     NUM_EXAMPLES = 32
     BATCH_SIZE = 8
     VERSION = f"v1_{datetime.datetime.now().strftime('%b_%d_%Y')}"
-    model_gcs_path = "gs://tf_models_cv/v1_Feb_15_2025/v1_Feb_09_2025.keras"
+    model_gcs_path = "gs://tf_models_cv/v1_Feb_15_2025/v1_Feb_15_2025.keras"
 
     # Create dataset
     train_ds, val_ds, num_classes, class_names = create_training_dataset(
