@@ -1,4 +1,4 @@
-from .model import train_model, create_model, save_model
+from .model import train_model, load_or_create_model, save_model
 from .dataset import create_training_dataset
 import datetime
 
@@ -17,7 +17,7 @@ def main():
     )
 
     # Create and train model
-    model = create_model(num_classes)
+    model = load_or_create_model(num_classes)
 
     train_model(
         model, train_ds, val_ds, class_names

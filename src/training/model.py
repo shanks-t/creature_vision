@@ -156,63 +156,6 @@ def compute_class_weight(dataset: tf.data.Dataset) -> dict:
     return weights
 
 
-def train_model(
-    model: tf.keras.Model,
-    train_ds: tf.data.Dataset,
-    val_ds: tf.data.Dataset,
-    class_names: list,
-    epochs: int = 20,
-) -> tf.keras.Model:
-    """Single phase training with metrics tracking"""
-    log_dir = f"logs/training/{datetime.now().strftime('%Y%m%d-%H%M')}"
-    metrics = TrainingMetrics(log_dir=log_dir)
-
-    # Configure model for transfer learning
-    model.trainable = False
-
-    # Train with class weights
-    model = train_phase(
-        model=model,
-        train_ds=train_ds,
-        val_ds=val_ds,
-        epochs=epochs,
-        phase_name="Transfer Learning",
-        learning_rate=1e-3,
-        metrics=metrics,
-        class_weight=compute_class_weight(train_ds)
-    )
-
-    return model
-
-
-def train_phase(
-    model: tf.keras.Model,
-    train_ds: tf.data.Dataset,
-    val_ds: tf.data.Dataset,
-    epochs: int,
-    phase_name: str,
-    learning_rate: float,
-    metrics: TrainingMetrics,
-    class_weight: dict = None,
-) -> tf.keras.callbacks.History:
-    """Training phase with integrated metric tracking"""
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate),
-        loss='sparse_categorical_crossentropy',
-        metrics=metrics.get_metrics()
-    )
-
-    model.fit(
-        train_ds,
-        validation_data=val_ds,
-        epochs=epochs,
-        callbacks=metrics.create_callbacks(),
-        class_weight=class_weight
-    )
-
-    return model
-
-
 def load_or_create_model(num_classes: int,
                          input_shape: tuple = (224, 224, 3),
                          model_gcs_path: str = None,
