@@ -56,3 +56,7 @@ run_local:
 	
 run_monitoring:
 	docker compose -f docker-compose.grafana.yaml up
+
+configure_kubectl:
+	gcloud container clusters get-credentials ml-cv-cluster --zone us-east1-a \
+	--project creature-vision
