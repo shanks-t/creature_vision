@@ -157,9 +157,7 @@ def compute_class_weight(dataset: tf.data.Dataset) -> dict:
 
 
 def load_or_create_model(num_classes: int,
-                         input_shape: tuple = (224, 224, 3),
-                         model_gcs_path: str = None,
-                         custom_objects: dict = None) -> tf.keras.Model:
+                         model_gcs_path: str = None) -> tf.keras.Model:
     """
     Loads a previously saved model from GCS if a model_gcs_path is provided.
     Otherwise, creates a new MobileNetV3-based model.
@@ -178,44 +176,10 @@ def load_or_create_model(num_classes: int,
         # download the model locally first if necessary.
         print(f"Loading model from {model_gcs_path}")
         model = tf.keras.models.load_model(
-            model_gcs_path, custom_objects=custom_objects)
+            model_gcs_path)
         return model
     else:
-        # Build a new model using MobileNetV3 as the base.
-        inputs = tf.keras.Input(shape=input_shape)
-        # Add preprocessing
-        x = tf.keras.applications.mobilenet_v3.preprocess_input(inputs)
-        # Add data augmentation layer (only active during training)
-        x = create_augmentation_layer()(x)
-        # Create base model
-        base_model = tf.keras.applications.MobileNetV3Small(
-            input_shape=input_shape,
-            include_top=False,
-            weights='imagenet'
-        )
-        x = base_model(x, training=False)
-        x = tf.keras.layers.GlobalAveragePooling2D()(x)
-
-        # Dense layers with regularization
-        dense_config = {
-            'kernel_regularizer': tf.keras.regularizers.l2(0.001),
-            'activation': 'swish'
-        }
-        x = tf.keras.layers.Dense(256, **dense_config)(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dropout(0.5)(x)
-
-        x = tf.keras.layers.Dense(128, **dense_config)(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dropout(0.4)(x)
-
-        outputs = tf.keras.layers.Dense(
-            num_classes,
-            activation='softmax',
-            kernel_regularizer=tf.keras.regularizers.l2(0.01)
-        )(x)
-
-        return tf.keras.Model(inputs, outputs)
+        return create_model(num_classes)
 
 
 def create_augmentation_layer():
