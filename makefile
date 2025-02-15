@@ -1,13 +1,14 @@
-APP_NAME := dog-prediction-app
+INFERENCE_APP_NAME := creature-vis-inference
+TRAINING_APP_NAME := creature-vis-training
 PROJECT_ID := creature-vision
 HOSTNAME := gcr.io
 REGION := us-east1
 IMAGE_NAME := c-vis
 ARTIFACT_REGISTRY := ${REGION}-docker.pkg.dev
-IMAGE_TAG := ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${APP_NAME}/${VERSION}
+IMAGE_TAG := ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${INFERNCE_APP_NAME}/${VERSION}
 
 build_docker:
-	docker build . -t ${APP_NAME}:latest -t ${APP_NAME}:${VERSION}
+	docker build . -t ${INFERNCE_APP_NAME}:latest -t ${INFERNCE_APP_NAME}:${VERSION}
 
 run_docker_local:
 	docker-compose -f docker/$(service)/docker-compose.local.yaml build --build-arg VERSION=$(VERSION)
@@ -33,7 +34,7 @@ auth_to_registry:
 	gcloud auth configure-docker us-east1-docker.pkg.dev
 
 push_to_registry:
-	docker tag ${PROJECT_ID}/${APP_NAME}-$(service):${VERSION} ${IMAGE_TAG}
+	docker tag ${PROJECT_ID}/${INFERNCE_APP_NAME}-$(service):${VERSION} ${IMAGE_TAG}
 	docker push ${IMAGE_TAG}
 
 cloud_run_deploy:
