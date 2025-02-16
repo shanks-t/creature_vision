@@ -21,6 +21,7 @@ services:
       - CLOUD_LOCATION=us-central1
       - MODEL_BUCKET=tf_models_cv
       - BASE_MODEL_PATH=gs://tf_models_cv/v1_Feb_15_2025/v1_Feb_15_2025.keras
+      - AIP_TENSORBOARD_LOG_DIR=gs://creture-vision-ml-artifacts/local
     deploy:
       resources:
         limits:
