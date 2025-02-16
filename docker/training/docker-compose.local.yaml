@@ -1,24 +1,30 @@
 services:
-  dog-prediction-app:
+  creature-vis-training:
     build:
       context: ../../
       dockerfile: docker/training/Dockerfile
       args:
         - BUILDPLATFORM=linux/arm64
         - TARGETARCH=arm64
-        - MODEL_VERSION=${VERSION}
-    image: dog-prediction-app:local
+    image: training:local
     platform: linux/arm64
     ports:
       - "8080:8080"
     volumes:
       - ~/.config/gcloud:/root/.config/gcloud
     environment:
-      # Set the environment variable for authentication
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
-      - MODEL_VERSION=${VERSION}
+      - TRAINING_BUCKET=creature-vision-training-set
+      - NUM_EXAMPLES=32
+      - BATCH_SIZE=8
+      - GOOGLE_CLOUD_PROJECT=creature-vision
+      - CLOUD_LOCATION=us-central1
+      - MODEL_BUCKET=tf_models_cv
+      - BASE_MODEL_PATH=gs://tf_models_cv/v1_Feb_15_2025/v1_Feb_15_2025.keras
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '1'
+          memory: 16G
+        reservations:
+          memory: 8G
+
