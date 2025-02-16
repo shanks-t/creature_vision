@@ -58,9 +58,6 @@ def create_training_dataset(
     class_names = label_processor.get_class_names()
     # print("class names:", class_names)
 
-    # # Create augmentation layer
-    # data_augmentation = create_augmentation_layer()
-
     # Create TF datasets
     train_ds = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
 

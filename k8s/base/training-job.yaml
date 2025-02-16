@@ -24,8 +24,15 @@ spec:
           value: "tf_models_cv"
         - name: BASE_MODEL_PATH
           value: "gs://tf_models_cv/v1_Feb_15_2025/v1_Feb_15_2025.keras"
+        - name: STAGING_BUCKET
+          value: "gs://creature-vision-ml-artifacts"
         - name: AIP_TENSORBOARD_LOG_DIR
-          value: "gs://creature-vision-ml-artifacts/logs"     
+          value: "gs://creature-vision-ml-artifacts/vertex_logs/$(EXP_VERSION)"
+        - name: EXP_VERSION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['app.kubernetes.io/version']
+     
         resources:
           requests:
             memory: "4Gi"
