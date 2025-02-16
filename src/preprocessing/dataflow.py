@@ -58,16 +58,22 @@ class ProcessDataPipeline:
             images, labels = self.data_loader._load_raw_batch(self.batch_size)
 
             examples = []
-            for img, lbl in zip(images, labels):
-                # Get or create label mapping
-                _, label_id = load_or_update_label_map(
-                    self.bucket_name,
-                    lbl['api_label']
-                )
+            # Initialize label map
+            label_map = {}
 
-                # Create TFRecord with integer label
+            # Process each image/label pair
+            for img, lbl in zip(images, labels):
+                api_label = lbl['api_label']
+
+                # Update label map before using it
+                label_map = load_or_update_label_map(
+                    self.bucket_name, api_label)
+                label_id = label_map[api_label]
+
+                # Create TFRecord
                 example = create_tfrecord_example(
                     tf.io.serialize_tensor(img).numpy(),
+                    api_label,
                     label_id
                 )
                 examples.append(example)
