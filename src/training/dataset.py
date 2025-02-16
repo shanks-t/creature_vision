@@ -63,11 +63,7 @@ def create_training_dataset(
 
     # Create TF datasets
     train_ds = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
-    # Apply augmentation only to training data
-    # train_ds = train_ds.map(
-    #     lambda x, y: (data_augmentation(tf.expand_dims(x, 0))[0], y),
-    #     num_parallel_calls=tf.data.AUTOTUNE
-    # )
+
     train_ds = train_ds.shuffle(1000).batch(
         batch_size).prefetch(tf.data.AUTOTUNE)
 
@@ -75,18 +71,3 @@ def create_training_dataset(
     val_ds = val_ds.shuffle(1000).batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
     return train_ds, val_ds, label_processor.get_num_classes(), class_names
-
-
-# def create_augmentation_layer():
-#     """Creates a sequential augmentation layer optimized for dog breed classification"""
-#     return tf.keras.Sequential([
-#         tf.keras.layers.RandomFlip("horizontal"),
-#         tf.keras.layers.RandomRotation(0.2),
-#         tf.keras.layers.RandomTranslation(0.15, 0.15),
-#         tf.keras.layers.RandomZoom(
-#             height_factor=(-0.2, -0.1),
-#             width_factor=(-0.2, -0.1)
-#         ),
-#         tf.keras.layers.RandomBrightness(0.2),
-#         tf.keras.layers.RandomContrast(0.2),
-#     ])
