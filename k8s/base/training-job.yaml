@@ -1,4 +1,3 @@
-# training-job.yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -9,7 +8,24 @@ spec:
       serviceAccountName: vertex-k8s-sa
       containers:
       - name: training
-        image: gcr.io/${PROJECT_ID}/training:latest
+        image: us-east1-docker.pkg.dev/creature-vision/creature-vis-training/training:latest
+        env:
+        - name: TRAINING_BUCKET
+          value: "creature-vision-training-set"
+        - name: NUM_EXAMPLES
+          value: "32"
+        - name: BATCH_SIZE
+          value: "8"
+        - name: GOOGLE_CLOUD_PROJECT
+          value: "creature-vision"
+        - name: CLOUD_LOCATION
+          value: "us-central1"
+        - name: MODEL_BUCKET
+          value: "tf_models_cv"
+        - name: BASE_MODEL_PATH
+          value: "gs://tf_models_cv/v1_Feb_15_2025/v1_Feb_15_2025.keras"
+        - name: AIP_TENSORBOARD_LOG_DIR
+          value: "gs://creature-vision-ml-artifacts/logs"     
         resources:
           requests:
             memory: "4Gi"
