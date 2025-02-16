@@ -10,9 +10,9 @@ resource "google_project_iam_member" "vertex_ai_user" {
   member  = "serviceAccount:${google_service_account.vertex_sa.email}"
 }
 
-resource "google_project_iam_member" "storage_object_viewer" {
+resource "google_project_iam_member" "storage_object_admin" {
   project = var.project_id
-  role    = "roles/storage.objectViewer"
+  role    = "roles/storage.objectAdmin"
   member  = "serviceAccount:${google_service_account.vertex_sa.email}"
 }
 
