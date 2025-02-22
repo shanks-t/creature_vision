@@ -14,7 +14,7 @@ def main():
     LOCATION = os.getenv("CLOUD_LOCATION", "us-central1")
     MODEL_BUCKET = os.getenv("MODEL_BUCKET", "tf_models_cv")
     STAGING_BUCKET = os.getenv("STAGING_BUCKET", "creture-vision-ml-artifacts")
-    model_gcs_path = "gs://tf_models_cv/feb-16-2025/feb-16-2025.keras"
+    model_gcs_path = "gs://tf_models_cv/feb-22-2025/feb-22-2025.keras"
     NEW_VERSION = f"{datetime.datetime.now().strftime('%b-%d-%Y')}".lower()
     experiment_config = {
         "experiment_name": f"{NEW_VERSION}",
@@ -25,9 +25,11 @@ def main():
 
     # Dataset preparation
     train_ds, val_ds, num_classes, class_names = create_training_dataset(
-        BUCKET_NAME,
-        NUM_EXAMPLES,
-        BATCH_SIZE
+        bucket_name=BUCKET_NAME,
+        tfrecord_path="processed/weekly_20250222",
+        labels_path="processed/metadata",
+        batch_size=BATCH_SIZE,
+        validation_split=0.2
     )
 
     # Model initialization

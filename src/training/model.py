@@ -12,12 +12,11 @@ def setup_model(
 
     # Define metrics
     metrics = [
-        tf.keras.metrics.SparseCategoricalAccuracy(name='train_accuracy'),
+        tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy'),
         tf.keras.metrics.SparseTopKCategoricalAccuracy(
-            k=5, name='train_top_5_accuracy'),
+            k=5, name='top_5_accuracy'),
         tf.keras.metrics.SparseCategoricalCrossentropy(
-            name='train_cross_entropy'),
-        tf.keras.metrics.SparseCategoricalAccuracy(name='val_accuracy'),
+            name='cross_entropy')
     ]
 
     # Create callbacks
