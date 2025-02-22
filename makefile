@@ -9,9 +9,10 @@ ARTIFACT_REGISTRY := ${REGION}-docker.pkg.dev
 # Service Names
 INFERENCE_APP := dog-prediction-app
 TRAINING_APP := creature-vis-training
+PREPROCESSING_APP := creature-vis-preprocessing
 
 # Validate Service Parameter
-VALID_SERVICES := inference training
+VALID_SERVICES := inference training preprocessing
 SERVICE ?= inference
 ifeq ($(filter $(SERVICE),$(VALID_SERVICES)),)
     $(error Invalid service. Must be one of: $(VALID_SERVICES))
@@ -20,6 +21,8 @@ endif
 # Service-specific variables
 ifeq ($(SERVICE),inference)
     APP_NAME := $(INFERENCE_APP)
+else ifeq ($(SERVICE),preprocessing)
+    APP_NAME := $(PREPROCESSING_APP)
 else
     APP_NAME := $(TRAINING_APP)
 endif
@@ -27,17 +30,23 @@ endif
 # Image Tag
 IMAGE_TAG := ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${APP_NAME}/${SERVICE}:${VERSION}
 
-.PHONY: help build run-local build-cloud push-ar push-gcr auth-registry configure-kubectl
+.PHONY: help build run-local build-cloud push-ar push-gcr auth-registry configure-kubectl get-deps
 
 help:
 	@echo "Available commands:"
-	@echo "  make build SERVICE=[inference|training]     - Build docker image locally"
-	@echo "  make run-local SERVICE=[inference|training] - Run service locally"
-	@echo "  make build-cloud SERVICE=[inference|training] - Build for cloud deployment"
-	@echo "  make push-ar SERVICE=[inference|training]   - Push to Artifact Registry"
-	@echo "  make push-gcr SERVICE=[inference|training]  - Push to Container Registry"
+	@echo "  make build SERVICE=[inference|training|preprocessing]     - Build docker image locally"
+	@echo "  make run-local SERVICE=[inference|training|preprocessing] - Run service locally"
+	@echo "  make build-cloud SERVICE=[inference|training|preprocessing] - Build for cloud deployment"
+	@echo "  make push-ar SERVICE=[inference|training|preprocessing]   - Push to Artifact Registry"
+	@echo "  make push-gcr SERVICE=[inference|training|preprocessing]  - Push to Container Registry"
 	@echo "  make auth-registry                         - Configure docker auth"
 	@echo "  make configure-kubectl                     - Configure kubectl"
+	@echo "  make get-deps SERVICE=[inference|training|preprocessing]  - Generate requirements.txt for service"
+
+get-deps:
+	@echo "Generating requirements.txt for $(SERVICE) service..."
+	pip install pipreqs
+	pipreqs ./src/$(SERVICE) --savepath ./src/$(SERVICE)/requirements.txt --use-local --force
 
 build:
 	docker build -f docker/$(SERVICE)/Dockerfile . \
