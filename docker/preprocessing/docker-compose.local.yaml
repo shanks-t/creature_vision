@@ -1,0 +1,26 @@
+services:
+  creature-vis:
+    build:
+      context: ../../
+      dockerfile: docker/preprocessing/Dockerfile
+      args:
+        - BUILDPLATFORM=linux/arm64
+        - TARGETARCH=arm64
+    image: preprocessing:local
+    platform: linux/arm64
+    ports:
+      - "8080:8080"
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - NUM_EXAMPLES=32
+      - GOOGLE_CLOUD_PROJECT=creature-vision
+      - CLOUD_LOCATION=us-east1
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 8G
+

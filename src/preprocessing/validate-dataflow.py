@@ -1,63 +1,102 @@
 import tensorflow as tf
 from google.cloud import storage
-import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 
-def validate_tfrecords(bucket_name: str, num_samples: int = 5):
-    """Validate TFRecords by inspecting samples and metadata"""
-    client = storage.Client()
-    blobs = client.list_blobs(bucket_name, prefix="processed_test/")
-    file_patterns = [
-        f"gs://{bucket_name}/{b.name}" for b in blobs if b.name.endswith('.tfrecord')]
+class TFRecordValidator:
+    def __init__(self, bucket_name: str, tfrecord_path: str):
+        """Initialize validator with GCS bucket and tfrecord path"""
+        self.bucket_name = bucket_name
+        self.tfrecord_path = tfrecord_path
+        self.full_path = f"gs://{bucket_name}/{tfrecord_path}"
 
-    # Parse function matching your TFRecord schema
-    def parse_tfrecord(example):
+    def _parse_tfrecord(self, example_proto):
+        """Parse the input tf.Example proto."""
         feature_description = {
             'image': tf.io.FixedLenFeature([], tf.string),
             'label': tf.io.FixedLenFeature([], tf.int64)
         }
-        parsed = tf.io.parse_single_example(example, feature_description)
-        image = tf.io.decode_jpeg(parsed['image'])  # Match your encoding
-        return image, parsed['label']
+        try:
+            parsed_features = tf.io.parse_single_example(
+                example_proto, feature_description)
 
-    # Create validation dataset
-    dataset = tf.data.TFRecordDataset(file_patterns)
-    dataset = dataset.map(parse_tfrecord)
+            # Decode the image
+            image = tf.io.parse_tensor(
+                parsed_features['image'], out_type=tf.uint8)
+            image = tf.cast(image, tf.float32)
+            label = parsed_features['label']
+            return image, label
+        except tf.errors.InvalidArgumentError as e:
+            print(f"Error parsing example: {e}")
+            return None, None
 
-    # Basic validation checks
-    print(f"Found {len(file_patterns)} TFRecord files")
-    element_count = sum(1 for _ in dataset)
-    print(
-        f"Total examples in TFRecords: {element_count} (should match your test limit)")
+    def check_file_exists(self):
+        """Verify the TFRecord file exists and print its size"""
+        client = storage.Client()
+        bucket = client.bucket(self.bucket_name)
+        blob = bucket.get_blob(self.tfrecord_path)
 
-    # Verify label distribution
-    label_counts = {}
-    label_examples = {}
-    for image, label in dataset:
-        label_id = int(label.numpy())
-        if label_id not in label_counts:
-            label_counts[label_id] = 0
-            label_examples[label_id] = image.numpy()
-        label_counts[label_id] += 1
+        if blob.exists():
+            print(f"Found TFRecord file. Size: {blob.size / 1024:.2f} KB")
+            return True
+        else:
+            print(f"TFRecord file not found at {self.full_path}")
+            return False
 
-    print("\nLabel Distribution:")
-    for label_id, count in label_counts.items():
-        print(f"Label {label_id}: {count} examples")
+    def validate_tfrecords(self, num_samples: int = 5):
+        """Validate TFRecords by loading and inspecting samples"""
+        if not self.check_file_exists():
+            return
 
-    # Visual inspection of samples
-    for idx, (image, label) in enumerate(dataset.take(num_samples)):
-        print(f"\nSample {idx+1}:")
-        print(f"Label: {label.numpy()}")
-        print(f"Image shape: {image.shape}")
-        print(f"Image dtype: {image.dtype}")
-        print(f"Pixel range: {np.min(image)}-{np.max(image)}")
+        print(f"\nAttempting to read from: {self.full_path}")
 
-        # Save sample images locally
-        plt.imshow(image.numpy().astype("uint8"))
-        plt.savefig(f"sample_{idx}.png")
-        plt.close()
+        try:
+            # Create TFRecord dataset with error handling
+            dataset = tf.data.TFRecordDataset([self.full_path])
+
+            # Count total records first
+            total_records = sum(1 for _ in dataset)
+            print(f"\nTotal records found: {total_records}")
+
+            if total_records == 0:
+                print("WARNING: TFRecord file exists but contains no records")
+                return
+
+            print(
+                f"\nValidating {min(num_samples, total_records)} samples from TFRecords...")
+
+            # Reset dataset for sample inspection
+            dataset = tf.data.TFRecordDataset([self.full_path])
+            parsed_dataset = dataset.map(self._parse_tfrecord)
+
+            for i, (image, label) in enumerate(parsed_dataset.take(num_samples)):
+                if image is None:
+                    continue
+
+                print(f"\nSample {i+1}:")
+                print(f"Image shape: {image.shape}")
+                print(f"Image dtype: {image.dtype}")
+                print(
+                    f"Image value range: [{tf.reduce_min(image).numpy():.2f}, {tf.reduce_max(image).numpy():.2f}]")
+                print(f"Label: {label.numpy()}")
+
+                # Basic image validation
+                if tf.reduce_any(tf.math.is_nan(image)):
+                    print("WARNING: Image contains NaN values")
+                if tf.reduce_any(tf.math.is_inf(image)):
+                    print("WARNING: Image contains Inf values")
+
+        except tf.errors.OpError as e:
+            print(f"TensorFlow error reading TFRecord: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
 
 
+# Usage
 if __name__ == "__main__":
-    validate_tfrecords("creature-vision-training-set", num_samples=3)
+    validator = TFRecordValidator(
+        bucket_name="creature-vision-training-set",
+        tfrecord_path="processed/weekly_20250222/data-00000-of-00001.tfrecord"
+    )
+    validator.validate_tfrecords()
