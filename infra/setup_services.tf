@@ -19,7 +19,8 @@ resource "google_project_service" "enabled_apis" {
     "logging.googleapis.com",
     "datacatalog.googleapis.com",
     "datastore.googleapis.com",
-    "compute.googleapis.com"
+    "compute.googleapis.com",
+    "container.googleapis.com",
   ])
 
   project = data.google_project.creature.project_id
@@ -51,31 +52,3 @@ resource "google_project_iam_member" "terraform_sa_roles" {
   role    = each.key
   member  = "serviceAccount:${google_service_account.terraform_sa.email}"
 }
-
-# Create a BigQuery dataset for storing feedback and metrics
-# resource "google_bigquery_dataset" "feedback_dataset" {
-#   dataset_id  = "animal_classification_feedback"
-#   description = "Dataset for storing user feedback and model metrics"
-#   location    = var.region
-#   project     = data.google_project.creature.project_id
-# }
-
-# Create a Cloud Run service for model serving
-# resource "google_cloud_run_service" "model_server" {
-#   name     = "animal-classification-model-server"
-#   location = var.region
-#   project  = data.google_project.creature.project_id
-
-#   template {
-#     spec {
-#       containers {
-#         image = "gcr.io/${data.google_project.creature.project_id}/model-server:latest"
-#       }
-#     }
-#   }
-
-#   traffic {
-#     percent         = 100
-#     latest_revision = true
-#   }
-# }

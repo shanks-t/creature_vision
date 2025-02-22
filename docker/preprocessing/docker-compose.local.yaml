@@ -1,12 +1,12 @@
 services:
-  creature-vis-training:
+  creature-vis:
     build:
       context: ../../
-      dockerfile: docker/training/Dockerfile
+      dockerfile: docker/preprocessing/Dockerfile
       args:
         - BUILDPLATFORM=linux/arm64
         - TARGETARCH=arm64
-    image: training:local
+    image: preprocessing:local
     platform: linux/arm64
     ports:
       - "8080:8080"
@@ -14,14 +14,9 @@ services:
       - ~/.config/gcloud:/root/.config/gcloud
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
-      - TRAINING_BUCKET=creature-vision-training-set
       - NUM_EXAMPLES=32
-      - BATCH_SIZE=8
       - GOOGLE_CLOUD_PROJECT=creature-vision
       - CLOUD_LOCATION=us-east1
-      - MODEL_BUCKET=tf_models_cv
-      - BASE_MODEL_PATH=gs://tf_models_cv/v1_Feb_15_2025/v1_Feb_15_2025.keras
-      - AIP_TENSORBOARD_LOG_DIR=gs://creture-vision-ml-artifacts/local
     deploy:
       resources:
         limits:

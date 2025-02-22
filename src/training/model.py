@@ -1,63 +1,69 @@
 import tensorflow as tf
 import os
 import json
-from datetime import datetime
 from collections import Counter
-import numpy as np
-from .metrics import TrainingMetrics
+from google.cloud import aiplatform
 
 
-def train_model(
+def setup_model(
+    model: tf.keras.Model,
+) -> tuple[tf.keras.Model, list, list]:
+    """Configures model and Vertex AI experiment without starting run"""
+
+    # Define metrics
+    metrics = [
+        tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy'),
+        tf.keras.metrics.SparseTopKCategoricalAccuracy(
+            k=5, name='top_5_accuracy'),
+        tf.keras.metrics.SparseCategoricalCrossentropy(
+            name='cross_entropy')
+    ]
+
+    # Create callbacks
+    callbacks = [
+        tf.keras.callbacks.TensorBoard(
+            log_dir=os.environ['AIP_TENSORBOARD_LOG_DIR'],
+            histogram_freq=1,
+            profile_batch=(50, 100),
+            update_freq='epoch'
+        ),
+        tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=5,
+            min_delta=0.001
+        )
+    ]
+
+    # Freeze base layers
+    for layer in model.layers[:-3]:
+        layer.trainable = False
+
+    return model, metrics, callbacks
+
+
+def run_training(
     model: tf.keras.Model,
     train_ds: tf.data.Dataset,
     val_ds: tf.data.Dataset,
-    class_names: list,
+    metrics: list,
+    callbacks: list,
+    class_weight: dict,
     epochs: int = 20,
+    learning_rate: float = 1e-3
 ) -> tf.keras.Model:
-    """Single phase training with metrics tracking"""
-    log_dir = f"logs/training/{datetime.now().strftime('%Y%m%d-%H%M')}"
-    metrics = TrainingMetrics(log_dir=log_dir)
-
-    # Configure model for transfer learning
-    model.trainable = False
-
-    # Train with class weights
-    model = train_phase(
-        model=model,
-        train_ds=train_ds,
-        val_ds=val_ds,
-        epochs=epochs,
-        phase_name="Transfer Learning",
-        learning_rate=1e-3,
-        metrics=metrics,
-        class_weight=compute_class_weight(train_ds)
-    )
-
-    return model
-
-
-def train_phase(
-    model: tf.keras.Model,
-    train_ds: tf.data.Dataset,
-    val_ds: tf.data.Dataset,
-    epochs: int,
-    phase_name: str,
-    learning_rate: float,
-    metrics: TrainingMetrics,
-    class_weight: dict = None,
-) -> tf.keras.callbacks.History:
-    """Training phase with integrated metric tracking"""
+    """Executes training within Vertex AI run context"""
+    # Compile and train inside run context
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate),
         loss='sparse_categorical_crossentropy',
-        metrics=metrics.get_metrics()
+        metrics=metrics
     )
 
-    model.fit(
+    history = model.fit(
         train_ds,
         validation_data=val_ds,
         epochs=epochs,
-        callbacks=metrics.create_callbacks(),
+        callbacks=callbacks,
         class_weight=class_weight
     )
 
@@ -108,25 +114,6 @@ def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.ker
     return tf.keras.Model(inputs, outputs)
 
 
-def create_augmentation_layer():
-    """Creates a sequential augmentation layer optimized for dog breed classification"""
-    return tf.keras.Sequential([
-        # Geometric transformations
-        tf.keras.layers.RandomFlip("horizontal"),
-        tf.keras.layers.RandomRotation(0.2),
-        tf.keras.layers.RandomTranslation(0.1, 0.1),
-        tf.keras.layers.RandomZoom(
-            height_factor=(-0.05, -0.15),
-            width_factor=(-0.05, -0.15)
-        ),
-
-        # Photometric transformations
-        tf.keras.layers.RandomBrightness(0.2),
-        tf.keras.layers.RandomContrast(0.2),
-
-    ])
-
-
 def compute_class_weight(dataset: tf.data.Dataset) -> dict:
     """
     Compute class weights from a TensorFlow dataset
@@ -156,91 +143,47 @@ def compute_class_weight(dataset: tf.data.Dataset) -> dict:
     return weights
 
 
-def train_model(
-    model: tf.keras.Model,
-    train_ds: tf.data.Dataset,
-    val_ds: tf.data.Dataset,
-    class_names: list,
-    epochs: int = 20,
-) -> tf.keras.Model:
-    """Single phase training with metrics tracking"""
-    log_dir = f"logs/training/{datetime.now().strftime('%Y%m%d-%H%M')}"
-    metrics = TrainingMetrics(log_dir=log_dir)
-
-    # Configure model for transfer learning
-    model.trainable = False
-
-    # Train with class weights
-    model = train_phase(
-        model=model,
-        train_ds=train_ds,
-        val_ds=val_ds,
-        epochs=epochs,
-        phase_name="Transfer Learning",
-        learning_rate=1e-3,
-        metrics=metrics,
-        class_weight=compute_class_weight(train_ds)
-    )
-
-    return model
-
-
-def train_phase(
-    model: tf.keras.Model,
-    train_ds: tf.data.Dataset,
-    val_ds: tf.data.Dataset,
-    epochs: int,
-    phase_name: str,
-    learning_rate: float,
-    metrics: TrainingMetrics,
-    class_weight: dict = None,
-) -> tf.keras.callbacks.History:
-    """Training phase with integrated metric tracking"""
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate),
-        loss='sparse_categorical_crossentropy',
-        metrics=metrics.get_metrics()
-    )
-
-    model.fit(
-        train_ds,
-        validation_data=val_ds,
-        epochs=epochs,
-        callbacks=metrics.create_callbacks(),
-        class_weight=class_weight
-    )
-
-    return model
-
-
-def load_or_create_model(num_classes: int,
-                         model_gcs_path: str = None) -> tf.keras.Model:
-    """
-    Loads a previously saved model from GCS if a model_gcs_path is provided.
-    Otherwise, creates a new MobileNetV3-based model.
-
-    Args:
-        num_classes: Number of output classes.
-        input_shape: Input shape of the images.
-        model_gcs_path: GCS path to load model from. Expects a 'gs://' URI.
-        custom_objects: Dictionary of custom objects needed for loading.
-
-    Returns:
-        A tf.keras.Model ready for further fine-tuning.
-    """
+def load_or_create_model(num_classes: int, model_gcs_path: str = None) -> tf.keras.Model:
+    """Loads existing model or creates new one with dynamic class adaptation"""
     if model_gcs_path:
-        # Load model from GCS. In VertexAI/Cloud Run GCS URIs can be used, but you can also
-        # download the model locally first if necessary.
-        print(f"Loading model from {model_gcs_path}")
-        model = tf.keras.models.load_model(
-            model_gcs_path)
-        return model
+        try:
+            # Load base model with preserved architecture
+            base_model = tf.keras.models.load_model(model_gcs_path)
+            print(f"Loaded base model from {model_gcs_path}")
+
+            # Extract penultimate layer outputs
+            penultimate_output = base_model.layers[-2].output
+
+            # Create new classifier head
+            new_output = tf.keras.layers.Dense(
+                num_classes,
+                activation='softmax',
+                kernel_regularizer=tf.keras.regularizers.l2(0.01),
+                name='dynamic_classifier'
+            )(penultimate_output)
+
+            # Reconstruct full model
+            model = tf.keras.Model(
+                inputs=base_model.input,
+                outputs=new_output,
+                name=base_model.name + "_adapted"
+            )
+
+            # Preserve previous layer weights
+            for layer in model.layers[:-1]:
+                layer.set_weights(base_model.get_layer(
+                    layer.name).get_weights())
+
+        except Exception as e:
+            print(f"Error adapting model: {str(e)}")
     else:
-        return create_model(num_classes)
+        model = create_model(num_classes)
+
+    return model
 
 
 def create_augmentation_layer():
-    """Creates a sequential augmentation layer optimized for dog breed classification"""
+    """Creates a sequential augmentation layer optimized for image classification"""
     return tf.keras.Sequential([
         # Geometric transformations
         tf.keras.layers.RandomFlip("horizontal"),

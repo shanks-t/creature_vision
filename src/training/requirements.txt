@@ -1,8 +1,7 @@
-flask
 tensorflow
+tensorboard
 pillow
-requests
 google-cloud-storage
 google-cloud-bigquery
 numpy
-structlog
+google-cloud-aiplatform[tensorboard]

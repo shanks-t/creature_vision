@@ -1,92 +1,88 @@
 import tensorflow as tf
-from ..preprocessing.data_loader import GCSDataLoader
-from ..preprocessing.image_processor import ImageProcessor
-from ..preprocessing.label_processor import LabelProcessor
 from typing import Tuple
+import json
+
+
+def parse_tfrecord_fn(example_proto):
+    """Parse TFRecord example."""
+    feature_description = {
+        'image': tf.io.FixedLenFeature([], tf.string),
+        'label': tf.io.FixedLenFeature([], tf.int64),
+    }
+
+    features = tf.io.parse_single_example(example_proto, feature_description)
+
+    # Decode the serialized tensor
+    image = tf.io.parse_tensor(features['image'], out_type=tf.uint8)
+
+    # Ensure the shape is correct
+    image = tf.ensure_shape(image, [224, 224, 3])
+
+    # Cast to float32 after parsing
+    image = tf.cast(image, tf.float32)
+
+    return image, features['label']
 
 
 def create_training_dataset(
     bucket_name: str,
-    num_examples: int,
+    tfrecord_path: str,
+    labels_path: str,
     batch_size: int,
     validation_split: float = 0.2
-) -> Tuple[tf.data.Dataset, int]:
+) -> Tuple[tf.data.Dataset, tf.data.Dataset, int, list]:
     """
-    Creates a training dataset from GCS bucket images.
-    Returns the dataset and number of classes.
+    Creates training and validation datasets from a single TFRecord file in GCS.
     """
+    # Get full GCS path
+    tfrecord_pattern = f"gs://{bucket_name}/{tfrecord_path}/*.tfrecord"
 
-    # Initialize processors
-    data_loader = GCSDataLoader(bucket_name)
-    image_processor = ImageProcessor()
-    label_processor = LabelProcessor()
+    # Verify TFRecord exists
+    if not tf.io.gfile.glob(tfrecord_pattern):
+        raise FileNotFoundError(
+            f"No TFRecord files found at {tfrecord_pattern}")
 
-    # Load and process data
-    images = []
-    labels = []
-    counter = 0
-    while len(images) < num_examples:
-        counter += 1
-        print(f"downloading batch #{counter} size {batch_size}")
-        batch_images, batch_labels = data_loader.load_batch(batch_size)
-        if not batch_images:
-            break
+    # Create dataset from TFRecords
+    dataset = tf.data.TFRecordDataset(tf.io.gfile.glob(tfrecord_pattern))
 
-        # Process images
-        processed_images = image_processor.preprocess_batch(
-            tf.convert_to_tensor(batch_images)
-        )
+    # Count records before parsing
+    dataset_size = sum(1 for _ in dataset)
+    if dataset_size == 0:
+        raise ValueError("TFRecord dataset is empty")
 
-        # Process labels
-        processed_labels = [
-            label_processor.process_label(label)
-            for label in batch_labels
-        ]
+    print(f"Found {dataset_size} records in TFRecord file")
 
-        images.extend(processed_images.numpy())
-        labels.extend(processed_labels)
+    # Calculate split sizes
+    val_size = int(dataset_size * validation_split)
 
-        # Calculate split
-    val_size = int(len(images) * validation_split)
+    # Parse TFRecords
+    dataset = dataset.map(
+        parse_tfrecord_fn,
+        num_parallel_calls=tf.data.AUTOTUNE
+    )
 
-    # Split data
-    train_images = images[:-val_size]
-    train_labels = labels[:-val_size]
-    val_images = images[-val_size:]
-    val_labels = labels[-val_size:]
+    # Split the dataset
+    train_ds = dataset.skip(val_size)
+    val_ds = dataset.take(val_size)
 
-    class_names = label_processor.get_class_names()
-    # print("class names:", class_names)
+    # Read class names from metadata file
+    label_map_path = f"gs://{bucket_name}/{labels_path}/label_map.json"
+    try:
+        with tf.io.gfile.GFile(label_map_path, 'r') as f:
+            label_map = json.loads(f.read())
+            # Convert label_map to ordered list of class names
+            class_names = [k for k, v in sorted(
+                label_map.items(), key=lambda x: x[1])]
+    except Exception as e:
+        raise ValueError(
+            f"Failed to read label map from {label_map_path}: {str(e)}")
 
-    # # Create augmentation layer
-    # data_augmentation = create_augmentation_layer()
+    num_classes = len(class_names)
+    print(f"Found {num_classes} classes: {class_names}")
 
-    # Create TF datasets
-    train_ds = tf.data.Dataset.from_tensor_slices((train_images, train_labels))
-    # Apply augmentation only to training data
-    # train_ds = train_ds.map(
-    #     lambda x, y: (data_augmentation(tf.expand_dims(x, 0))[0], y),
-    #     num_parallel_calls=tf.data.AUTOTUNE
-    # )
+    # Optimize datasets for training
     train_ds = train_ds.shuffle(1000).batch(
         batch_size).prefetch(tf.data.AUTOTUNE)
+    val_ds = val_ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
-    val_ds = tf.data.Dataset.from_tensor_slices((val_images, val_labels))
-    val_ds = val_ds.shuffle(1000).batch(batch_size).prefetch(tf.data.AUTOTUNE)
-
-    return train_ds, val_ds, label_processor.get_num_classes(), class_names
-
-
-# def create_augmentation_layer():
-#     """Creates a sequential augmentation layer optimized for dog breed classification"""
-#     return tf.keras.Sequential([
-#         tf.keras.layers.RandomFlip("horizontal"),
-#         tf.keras.layers.RandomRotation(0.2),
-#         tf.keras.layers.RandomTranslation(0.15, 0.15),
-#         tf.keras.layers.RandomZoom(
-#             height_factor=(-0.2, -0.1),
-#             width_factor=(-0.2, -0.1)
-#         ),
-#         tf.keras.layers.RandomBrightness(0.2),
-#         tf.keras.layers.RandomContrast(0.2),
-#     ])
+    return train_ds, val_ds, num_classes, class_names
