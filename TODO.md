@@ -23,3 +23,7 @@ using Vertex Explainable AI to generate feature attributions. Aggregate feature 
 - Use Vertex Explainable AI to generate feature attributions. Aggregate feature attributions over the entire dataset. Analyze the aggregation result together with the standard model evaluation metrics. Aggregating feature attributions over the entire dataset allows you to identify patterns, such as which features consistently have a strong influence on the model's predictions. This aggregated view can help uncover potential biases or systemic issues in how the model processes different types of input data.
 
 - I can Chain the Vertex AI ModelUploadOp and ModelDeployOp components together to configure a pipeline to upload a new version of the a model to Vertex AI Model Registry and deploy it to Vertex AI Endpoints for online inference 
+
+-Use the RunInference API with WatchFilePattern in a Dataflow job that wraps around the model and serves predictions.
+
+Using the RunInference API with WatchFilePattern in a Dataflow job allows direct integration of the prediction logic within your data processing pipeline, reducing network latency by keeping everything within the same service. The WatchFilePattern ensures that the model is automatically updated without manual intervention, aligning with the requirement for minimal effort in updating the model. This approach is highly scalable and potentially offers the lowest latency among the options since it avoids external network calls for predictions

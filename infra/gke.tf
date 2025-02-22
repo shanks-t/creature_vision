@@ -1,13 +1,23 @@
-# gke.tf
 resource "google_container_cluster" "primary" {
   name     = "ml-cv-cluster"
   location = var.zone
 
-  # Use a zonal cluster to reduce costs
+  # Enable the free control plane by using DNS-based endpoint
+  release_channel {
+    channel = "REGULAR"
+  }
+
+  # Remove default node pool
   remove_default_node_pool = true
   initial_node_count       = 1
 
-  # Enable Workload Identity for Vertex AI integration
+  # Disable cluster autoscaling since we're optimizing for minimum cost
+  # You can enable it later when needed
+  cluster_autoscaling {
+    enabled = false
+  }
+
+  # Keep Workload Identity for Vertex AI integration
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
   }
@@ -27,29 +37,41 @@ resource "google_container_node_pool" "primary_nodes" {
   location = var.zone
   cluster  = google_container_cluster.primary.name
 
-  # Autoscaling configuration
+  # Single node configuration with minimum autoscaling
   autoscaling {
     min_node_count = 0
-    max_node_count = 3
+    max_node_count = 1
   }
 
   node_config {
-    machine_type = "n1-standard-4"
+    # Use n2-standard-2 for better pricing
+    machine_type = "n2-standard-2"
 
-    # Enable GPU if needed
-    # guest_accelerator {
-    #   type  = "nvidia-tesla-t4"
-    #   count = 1
-    # }
+    # Enable Spot VMs for cost savings
+    spot = true
+
+    # Preemptible is an older version of Spot VMs, use spot instead
+    # preemptible = true
 
     oauth_scopes = [
       "https://www.googleapis.com/auth/cloud-platform"
     ]
 
-    # Enable Workload Identity
+    # Keep Workload Identity
     workload_metadata_config {
       mode = "GKE_METADATA"
     }
+
+    # Optional: Add labels to track spot instances
+    labels = {
+      "cloud.google.com/gke-spot" = "true"
+    }
+  }
+
+  # Recommended for Spot VMs to handle preemption gracefully
+  management {
+    auto_repair  = true
+    auto_upgrade = true
   }
 
   depends_on = [
