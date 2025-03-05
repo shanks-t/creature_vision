@@ -1,22 +1,38 @@
-FROM python:3.10.12-slim
+FROM gcr.io/dataflow-templates-base/flex-template-launcher-image:latest as template_launcher
 
-ENV PYTHONUNBUFFERED=1
-WORKDIR /app
+FROM python:3.10-slim
 
-# Copy and install requirements
-COPY ../../src/preprocessing/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+WORKDIR /workspace
 
-# Copy application code
-COPY ../../src/preprocessing src/preprocessing/
-COPY docker/preprocessing/entrypoint.sh /
+COPY requirements.txt requirements.txt
 
-RUN chmod +x /entrypoint.sh
+ENV FLEX_TEMPLATE_PYTHON_REQUIREMENTS_FILE="/workspace/requirements.txt"
+ENV FLEX_TEMPLATE_PYTHON_PY_FILE="/workspace/df_flex/main.py"
+ENV FLEX_TEMPLATE_PYTHON_SETUP_FILE="/workspace/setup.py"
 
-ENV PYTHONPATH="/app/src:${PYTHONPATH}"
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl https://bootstrap.pypa.io/get-pip.py | python \
+    && pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir tensorflow==2.12.1
 
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -c "import os; exit(0 if os.path.exists('/tmp/healthy') else 1)"
+# Copy the run module
+COPY . /workspace/
+RUN rm -fr /workspace/__pycache__
 
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "-m", "src.preprocessing.main"]
+# Since we already downloaded all the dependencies, there's no need to rebuild everything.
+ENV PIP_NO_DEPS=True
+
+ENV PYTHONPATH="/workspace:${PYTHONPATH}"
+
+# Copy the Dataflow Template launcher
+COPY --from=template_launcher /opt/google/dataflow/python_template_launcher /opt/google/dataflow/python_template_launcher
+
+# Copy files from official SDK image, including script/dependencies.
+COPY --from=apache/beam_python3.10_sdk:latest /opt/apache/beam /opt/apache/beam
+
+# Set the entrypoint to Apache Beam SDK launcher.
+ENTRYPOINT ["/opt/apache/beam/boot"]
