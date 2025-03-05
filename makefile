@@ -30,7 +30,16 @@ endif
 # Image Tag
 IMAGE_TAG := ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${APP_NAME}/${SERVICE}:${VERSION}
 
-.PHONY: help build run-local build-cloud push-ar push-gcr auth-registry configure-kubectl get-deps
+# Dataflow parameters
+MAXFILES ?= 500
+RANDOM_SEED ?= 42
+
+# Template variables for test-template
+GCP_PROJECT ?= $(PROJECT_ID)
+GCP_REGION ?= $(REGION)
+TEMPLATE_IMAGE ?= ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${PREPROCESSING_APP}/preprocessing:${VERSION}
+
+.PHONY: help build run-local build-cloud push-ar push-gcr auth-registry configure-kubectl get-deps test-template
 
 help:
 	@echo "Available commands:"
@@ -42,6 +51,7 @@ help:
 	@echo "  make auth-registry                         - Configure docker auth"
 	@echo "  make configure-kubectl                     - Configure kubectl"
 	@echo "  make get-deps SERVICE=[inference|training|preprocessing]  - Generate requirements.txt for service"
+	@echo "  make test-template                         - Test the integrity of the Flex Container"
 
 get-deps:
 	@echo "Generating requirements.txt for $(SERVICE) service..."
@@ -49,9 +59,10 @@ get-deps:
 	pipreqs ./src/$(SERVICE) --savepath ./src/$(SERVICE)/requirements.txt --use-local --force
 
 build:
-	docker build -f docker/$(SERVICE)/Dockerfile . \
-		-t ${APP_NAME}:${VERSION} \
-		-t ${APP_NAME}:latest
+	docker buildx build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
+		--platform linux/amd64 \
+		-t ${IMAGE_TAG} \
+		--load
 
 run-local:
 	docker-compose -f docker/$(SERVICE)/docker-compose.local.yaml build \
@@ -60,7 +71,7 @@ run-local:
 	docker compose -f docker/$(SERVICE)/docker-compose.local.yaml rm -fsv
 
 build-push: auth-registry
-	docker buildx build -f docker/$(SERVICE)/Dockerfile . \
+	docker buildx build --no-cache -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
 		--platform linux/amd64 \
 		-t ${IMAGE_TAG} \
 		--push
@@ -77,6 +88,30 @@ configure-kubectl:
 		--zone us-east1-b \
 		--project $(PROJECT_ID)
 
-# Monitoring remains unchanged
+create-df-template:
+	gcloud dataflow flex-template build gs://dataflow-use1/templates/creature-vision-template.json \
+	--image=us-east1-docker.pkg.dev/creature-vision/creature-vis-preprocessing/preprocessing:latest \
+	--sdk-language=PYTHON \
+	--metadata-file=./src/preprocessing/metadata.json
+
+run-dataflow:
+	@echo "Running Dataflow job with max_files=$(MAXFILES)..."
+	gcloud dataflow flex-template run "creature-vis-processing" \
+	--template-file-gcs-location=gs://dataflow-use1/templates/creature-vision-template.json \
+	--region=us-east1 \
+	--parameters=max_files=$(MAXFILES)
+
 run-monitoring:
 	docker compose -f docker-compose.grafana.yaml up
+
+test-template: ## Test the Integrity of the Flex Container
+	@gcloud config set project ${GCP_PROJECT}
+	@gcloud auth configure-docker ${GCP_REGION}-docker.pkg.dev
+	@docker pull --platform linux/amd64 ${TEMPLATE_IMAGE}
+	@echo "Checking if ENV Var FLEX_TEMPLATE_PYTHON_PY_FILE is Available" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'env|grep -q "FLEX_TEMPLATE_PYTHON_PY_FILE" && echo ✓'
+	@echo "Checking if ENV Var FLEX_TEMPLATE_PYTHON_SETUP_FILE is Available" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'env|grep -q "FLEX_TEMPLATE_PYTHON_PY_FILE" && echo ✓'
+	@echo "Checking if Driver Python File (main.py) Found on Container" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c "/usr/bin/test -f ${FLEX_TEMPLATE_PYTHON_PY_FILE} && echo ✓"
+	@echo "Checking if setup.py File Found on Container" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'test -f ${FLEX_TEMPLATE_PYTHON_SETUP_FILE} && echo ✓'
+	@echo "Checking if Package Installed on Container" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'python -c "import beam_flex" && echo ✓'
+	@echo "Checking if UDFs Installed on Container" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'python -c "from beam_flex.modules.pipeline import GCSImagePathProvider" && echo ✓'
+	@echo "Running Pipeline Locally..." && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c "python ${FLEX_TEMPLATE_PYTHON_PY_FILE} --runner DirectRunner --output output.txt && cat output.txt*"
