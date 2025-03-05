@@ -1,0 +1,51 @@
+{
+    "name": "Creature Vision Preprocessing Pipeline",
+    "description": "Process images and create TFRecords using Dataflow",
+    "parameters": [
+        {
+            "name": "max_files",
+            "label": "Maximum number of files to process",
+            "helpText": "Maximum number of files to process",
+            "isOptional": true,
+            "regexes": [
+                "^[0-9]+$"
+            ]
+        },
+        {
+            "name": "random_seed",
+            "label": "Random seed for reproducibility",
+            "helpText": "Random seed for reproducibility",
+            "isOptional": true,
+            "regexes": [
+                "^[0-9]+$"
+            ]
+        },
+        {
+            "name": "disk_size_gb",
+            "label": "Worker disk size in GB",
+            "helpText": "Size of the disk for each worker in gigabytes",
+            "isOptional": true,
+            "regexes": [
+                "^[0-9]+$"
+            ]
+        },
+        {
+            "name": "max_num_workers",
+            "label": "Maximum number of workers",
+            "helpText": "Maximum number of workers for the Dataflow job",
+            "isOptional": true,
+            "regexes": [
+                "^[0-9]+$"
+            ]
+        },
+        {
+            "name": "worker_threads",
+            "label": "Number of worker harness threads",
+            "helpText": "Number of threads per worker for processing",
+            "isOptional": true,
+            "regexes": [
+                "^[0-9]+$"
+            ]
+        }
+    ]
+}
