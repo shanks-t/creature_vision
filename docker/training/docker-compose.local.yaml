@@ -1,8 +1,8 @@
 services:
   creature-vis-training:
     build:
-      context: ../../
-      dockerfile: docker/training/Dockerfile
+      context: ../../src/training/
+      dockerfile: ../../docker/training/Dockerfile
       args:
         - BUILDPLATFORM=linux/arm64
         - TARGETARCH=arm64
