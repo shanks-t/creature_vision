@@ -1,7 +1,5 @@
-apache_beam==2.62.0
-tensorflow==2.18.0
-google-cloud-storage==2.19.0
-numpy==2.0.2
-pillow==11.0.0
-python-snappy==0.6.1
-apache-beam[gcp]==2.62.0
+tensorflow
+numpy<2.0.0
+apache-beam[gcp]
+pillow>=8.0.0
+google-cloud-storage

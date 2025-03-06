@@ -1,5 +1,5 @@
 services:
-  creature-vis:
+  creature-vis-processing:
     build:
       context: ../../
       dockerfile: docker/preprocessing/Dockerfile
@@ -8,6 +8,7 @@ services:
         - TARGETARCH=arm64
     image: preprocessing:local
     platform: linux/arm64
+    command: ["local", "--project=creature-vision", "--runner=DirectRunner"]
     ports:
       - "8080:8080"
     volumes:
@@ -23,4 +24,3 @@ services:
           memory: 16G
         reservations:
           memory: 8G
-

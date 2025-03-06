@@ -1,5 +1,5 @@
-from .model import setup_model, run_training, load_or_create_model, save_model, compute_class_weight
-from .dataset import create_training_dataset
+from model import setup_model, run_training, load_or_create_model, save_model, compute_class_weight
+from dataset import create_training_dataset
 from google.cloud import aiplatform
 import datetime
 import os
