@@ -22,11 +22,12 @@ def main():
         "location": LOCATION,
         "staging_bucket": STAGING_BUCKET
     }
-
+    # Format the date as YYYYMMDD
+    date_str = datetime.datetime.now().strftime("%Y%m%d")
     # Dataset preparation
     train_ds, val_ds, num_classes, class_names = create_training_dataset(
         bucket_name=BUCKET_NAME,
-        tfrecord_path="processed/weekly_20250222",
+        tfrecord_path=f"processed/weekly_{date_str}",
         labels_path="processed/metadata",
         batch_size=BATCH_SIZE,
         validation_split=0.2
