@@ -1,4 +1,4 @@
-FROM gcr.io/dataflow-templates-base/flex-template-launcher-image:latest as template_launcher
+FROM gcr.io/dataflow-templates-base/flex-template-launcher-image:latest AS template_launcher
 
 FROM python:3.10-slim
 
@@ -12,12 +12,10 @@ ENV FLEX_TEMPLATE_PYTHON_SETUP_FILE="/workspace/setup.py"
 
 RUN apt-get update && apt-get install -y \
     curl \
-    gnupg \
     && rm -rf /var/lib/apt/lists/* \
     && curl https://bootstrap.pypa.io/get-pip.py | python \
     && pip install --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir tensorflow==2.12.1
+    && pip install --no-cache-dir -r requirements.txt 
 
 # Copy the run module
 COPY . /workspace/
