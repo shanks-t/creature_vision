@@ -1,5 +1,4 @@
 tensorflow
-tensorflow_hub
 numpy<2.0.0
 apache-beam[gcp]
 pillow>=8.0.0

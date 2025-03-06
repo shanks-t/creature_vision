@@ -8,6 +8,7 @@ from df_flex.logging_utils import setup_logger, timer, log_execution_time
 import io
 from PIL import Image
 import numpy as np
+import os
 
 logger = setup_logger('pipeline')
 
@@ -116,6 +117,10 @@ class ProcessImageAndLabel(beam.DoFn):
             # Derive label path from image path
             label_path = image_path.replace('.jpg', '_labels.json')
 
+            # Extract filename without extension
+            filename = os.path.basename(image_path)
+            filename_without_ext = os.path.splitext(filename)[0]
+
             # Download image
             image_blob = self.bucket.blob(image_path)
             image_bytes = image_blob.download_as_bytes()
@@ -139,7 +144,8 @@ class ProcessImageAndLabel(beam.DoFn):
             # Create and yield TFRecord example
             feature = {
                 'image': tf.train.Feature(bytes_list=tf.train.BytesList(value=[image_bytes])),
-                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label_id]))
+                'label': tf.train.Feature(int64_list=tf.train.Int64List(value=[label_id])),
+                'filename': tf.train.Feature(bytes_list=tf.train.BytesList(value=[filename_without_ext.encode()]))
             }
             example = tf.train.Example(features=tf.train.Features(
                 feature=feature)).SerializeToString()
