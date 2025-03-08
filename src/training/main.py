@@ -22,18 +22,19 @@ def main():
         "location": LOCATION,
         "staging_bucket": STAGING_BUCKET
     }
-
+    # Format the date as YYYYMMDD
+    date_str = datetime.datetime.now().strftime("%Y%m%d")
     # Dataset preparation
     train_ds, val_ds, num_classes, class_names = create_training_dataset(
         bucket_name=BUCKET_NAME,
-        tfrecord_path="processed/weekly_20250222",
+        tfrecord_path=f"processed/weekly_{date_str}",
         labels_path="processed/metadata",
         batch_size=BATCH_SIZE,
-        validation_split=0.2
+        validation_split=0.3
     )
 
     # Model initialization
-    model = load_or_create_model(num_classes, model_gcs_path=model_gcs_path)
+    model = load_or_create_model(num_classes, model_gcs_path=None)
     # Initialize Vertex AI experiment
     aiplatform.init(
         experiment=experiment_config["experiment_name"],

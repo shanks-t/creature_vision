@@ -1,8 +1,8 @@
 services:
   creature-vis-training:
     build:
-      context: ../../
-      dockerfile: docker/training/Dockerfile
+      context: ../../src/training/
+      dockerfile: ../../docker/training/Dockerfile
       args:
         - BUILDPLATFORM=linux/arm64
         - TARGETARCH=arm64
@@ -15,8 +15,7 @@ services:
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
       - TRAINING_BUCKET=creature-vision-training-set
-      - NUM_EXAMPLES=32
-      - BATCH_SIZE=8
+      - BATCH_SIZE=16
       - GOOGLE_CLOUD_PROJECT=creature-vision
       - CLOUD_LOCATION=us-east1
       - MODEL_BUCKET=tf_models_cv

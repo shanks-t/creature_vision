@@ -6,7 +6,7 @@ touch /tmp/healthy
 trap 'kill -TERM $PID' TERM INT
 
 # Start the Python process
-python -m src.training.main &
+python -m main &
 PID=$!
 
 # Wait for the Python process to complete
