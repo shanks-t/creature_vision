@@ -83,11 +83,6 @@ push-image: auth-registry
 	docker tag ${APP_NAME}:${VERSION} ${IMAGE_TAG}
 	docker push ${IMAGE_TAG}
 
-configure-kubectl:
-	gcloud container clusters get-credentials ml-cv-cluster \
-		--zone us-east1-b \
-		--project $(PROJECT_ID)
-
 create-df-template:
 	gcloud dataflow flex-template build gs://dataflow-use1/templates/creature-vision-template.json \
 	--image=us-east1-docker.pkg.dev/creature-vision/creature-vis-preprocessing/preprocessing:latest \
