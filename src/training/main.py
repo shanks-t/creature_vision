@@ -30,11 +30,11 @@ def main():
         tfrecord_path=f"processed/weekly_{date_str}",
         labels_path="processed/metadata",
         batch_size=BATCH_SIZE,
-        validation_split=0.2
+        validation_split=0.3
     )
 
     # Model initialization
-    model = load_or_create_model(num_classes, model_gcs_path=model_gcs_path)
+    model = load_or_create_model(num_classes, model_gcs_path=None)
     # Initialize Vertex AI experiment
     aiplatform.init(
         experiment=experiment_config["experiment_name"],
