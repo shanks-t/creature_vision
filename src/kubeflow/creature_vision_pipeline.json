@@ -1,0 +1,311 @@
+{
+    "components": {
+        "comp-build-inference-image": {
+            "executorLabel": "exec-build-inference-image",
+            "inputDefinitions": {
+                "parameters": {
+                    "model_output_path": {
+                        "parameterType": "STRING"
+                    },
+                    "model_version": {
+                        "parameterType": "STRING"
+                    }
+                }
+            }
+        },
+        "comp-deploy-cloud-run": {
+            "executorLabel": "exec-deploy-cloud-run"
+        },
+        "comp-get-previous-model": {
+            "executorLabel": "exec-get-previous-model",
+            "inputDefinitions": {
+                "parameters": {
+                    "bucket": {
+                        "parameterType": "STRING"
+                    }
+                }
+            },
+            "outputDefinitions": {
+                "parameters": {
+                    "Output": {
+                        "parameterType": "STRING"
+                    }
+                }
+            }
+        },
+        "comp-run-dataflow": {
+            "executorLabel": "exec-run-dataflow",
+            "inputDefinitions": {
+                "parameters": {
+                    "model_version": {
+                        "parameterType": "STRING"
+                    }
+                }
+            }
+        },
+        "comp-train-model": {
+            "executorLabel": "exec-train-model",
+            "inputDefinitions": {
+                "parameters": {
+                    "model_version": {
+                        "parameterType": "STRING"
+                    },
+                    "pipeline_root": {
+                        "parameterType": "STRING"
+                    },
+                    "previous_model_version": {
+                        "parameterType": "STRING"
+                    },
+                    "project_id": {
+                        "parameterType": "STRING"
+                    },
+                    "region": {
+                        "parameterType": "STRING"
+                    },
+                    "training_image": {
+                        "parameterType": "STRING"
+                    }
+                }
+            }
+        }
+    },
+    "defaultPipelineRoot": "gs://creature-vision-pipeline-artifacts",
+    "deploymentSpec": {
+        "executors": {
+            "exec-build-inference-image": {
+                "container": {
+                    "args": [
+                        "\n            echo \"Building and pushing new inference container...\"\n            docker build -t us-east1-docker.pkg.dev/creature-vision/dog-prediction-app/inference:latest --build-arg MODEL_URI={{$.inputs.parameters['model_output_path']}} --build-arg MODEL_VERSION={{$.inputs.parameters['model_version']}} .\n            docker push us-east1-docker.pkg.dev/creature-vision/dog-prediction-app/inference:latest\n            "
+                    ],
+                    "command": [
+                        "bash",
+                        "-c"
+                    ],
+                    "image": "gcr.io/cloud-builders/docker"
+                }
+            },
+            "exec-deploy-cloud-run": {
+                "container": {
+                    "args": [
+                        "run",
+                        "deploy",
+                        "dog-prediction-app",
+                        "--image",
+                        "us-east1-docker.pkg.dev/creature-vision/dog-prediction-app/inference:latest",
+                        "--region",
+                        "us-east1",
+                        "--platform",
+                        "managed",
+                        "--allow-unauthenticated"
+                    ],
+                    "command": [
+                        "gcloud"
+                    ],
+                    "image": "gcr.io/google.com/cloudsdktool/cloud-sdk:latest"
+                }
+            },
+            "exec-get-previous-model": {
+                "container": {
+                    "args": [
+                        "--executor_input",
+                        "{{$}}",
+                        "--function_to_execute",
+                        "get_previous_model"
+                    ],
+                    "command": [
+                        "sh",
+                        "-c",
+                        "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"$0\" \"$@\"\n",
+                        "sh",
+                        "-ec",
+                        "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+                        "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket: str) -> str:\n    \"\"\"Fetch the previous model version from GCS.\"\"\"\n    import subprocess\n\n    cmd = f\"gsutil ls {bucket}/ | grep -o 'v-[0-9]*-[0-9]*' | sort | tail -n 1\"\n    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)\n\n    latest_model = result.stdout.strip()\n    print(f\"Latest model version: {latest_model}\")\n\n    return latest_model\n\n"
+                    ],
+                    "image": "gcr.io/google.com/cloudsdktool/cloud-sdk:latest"
+                }
+            },
+            "exec-run-dataflow": {
+                "container": {
+                    "args": [
+                        "dataflow",
+                        "flex-template",
+                        "run",
+                        "creature-vis-processing",
+                        "--template-file-gcs-location=gs://dataflow-use1/templates/creature-vision-template.json",
+                        "--region=us-east1",
+                        "--parameters=max_files=1000",
+                        "--parameters=model_version={{$.inputs.parameters['model_version']}}"
+                    ],
+                    "command": [
+                        "gcloud"
+                    ],
+                    "image": "gcr.io/google.com/cloudsdktool/cloud-sdk:latest"
+                }
+            },
+            "exec-train-model": {
+                "container": {
+                    "args": [
+                        "--executor_input",
+                        "{{$}}",
+                        "--function_to_execute",
+                        "train_model"
+                    ],
+                    "command": [
+                        "sh",
+                        "-c",
+                        "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"$0\" \"$@\"\n",
+                        "sh",
+                        "-ec",
+                        "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+                        "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef train_model(\n    model_version: str,\n    previous_model_version: str,\n    pipeline_root: str,\n    project_id: str,\n    region: str,\n    training_image: str\n):\n    \"\"\"Executes a Vertex AI Custom Training Job using a container.\"\"\"\n    from google.cloud import aiplatform\n\n    # Initialize Vertex AI\n    aiplatform.init(project=project_id, location=region,\n                    staging_bucket=pipeline_root)\n\n    # Create a Custom Training Job\n    train_job = aiplatform.CustomContainerTrainingJob(\n        display_name=\"train-creature-model\",\n        container_uri=training_image,\n        model_serving_container_image_uri=\"us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-9:latest\"\n    )\n\n    # Run Training\n    train_job.run(\n        model_display_name=\"creature-vision-model\",\n        args=[\n            \"--previous_model_version\", previous_model_version,\n            \"--model_version\", model_version\n        ]\n    )\n\n"
+                    ],
+                    "image": "python:3.10"
+                }
+            }
+        }
+    },
+    "pipelineInfo": {
+        "description": "Pipeline that orchestrates Dataflow preprocessing, training, and Cloud Run deployment.",
+        "name": "creature-vision-pipeline"
+    },
+    "root": {
+        "dag": {
+            "tasks": {
+                "build-inference-image": {
+                    "cachingOptions": {
+                        "enableCache": true
+                    },
+                    "componentRef": {
+                        "name": "comp-build-inference-image"
+                    },
+                    "dependentTasks": [
+                        "train-model"
+                    ],
+                    "inputs": {
+                        "parameters": {
+                            "model_output_path": {
+                                "runtimeValue": {
+                                    "constant": "gs://tf_models_cv/v-20250309-1340/v-20250309-1340.keras"
+                                }
+                            },
+                            "model_version": {
+                                "runtimeValue": {
+                                    "constant": "v-20250309-1340"
+                                }
+                            }
+                        }
+                    },
+                    "taskInfo": {
+                        "name": "build-inference-image"
+                    }
+                },
+                "deploy-cloud-run": {
+                    "cachingOptions": {
+                        "enableCache": true
+                    },
+                    "componentRef": {
+                        "name": "comp-deploy-cloud-run"
+                    },
+                    "dependentTasks": [
+                        "build-inference-image"
+                    ],
+                    "taskInfo": {
+                        "name": "deploy-cloud-run"
+                    }
+                },
+                "get-previous-model": {
+                    "cachingOptions": {
+                        "enableCache": true
+                    },
+                    "componentRef": {
+                        "name": "comp-get-previous-model"
+                    },
+                    "inputs": {
+                        "parameters": {
+                            "bucket": {
+                                "runtimeValue": {
+                                    "constant": "gs://tf_models_cv"
+                                }
+                            }
+                        }
+                    },
+                    "taskInfo": {
+                        "name": "get-previous-model"
+                    }
+                },
+                "run-dataflow": {
+                    "cachingOptions": {
+                        "enableCache": true
+                    },
+                    "componentRef": {
+                        "name": "comp-run-dataflow"
+                    },
+                    "inputs": {
+                        "parameters": {
+                            "model_version": {
+                                "runtimeValue": {
+                                    "constant": "v-20250309-1340"
+                                }
+                            }
+                        }
+                    },
+                    "taskInfo": {
+                        "name": "run-dataflow"
+                    }
+                },
+                "train-model": {
+                    "cachingOptions": {
+                        "enableCache": true
+                    },
+                    "componentRef": {
+                        "name": "comp-train-model"
+                    },
+                    "dependentTasks": [
+                        "get-previous-model",
+                        "run-dataflow"
+                    ],
+                    "inputs": {
+                        "parameters": {
+                            "model_version": {
+                                "runtimeValue": {
+                                    "constant": "v-20250309-1340"
+                                }
+                            },
+                            "pipeline_root": {
+                                "runtimeValue": {
+                                    "constant": "gs://creature-vision-pipeline-artifacts"
+                                }
+                            },
+                            "previous_model_version": {
+                                "taskOutputParameter": {
+                                    "outputParameterKey": "Output",
+                                    "producerTask": "get-previous-model"
+                                }
+                            },
+                            "project_id": {
+                                "runtimeValue": {
+                                    "constant": "creature-vision"
+                                }
+                            },
+                            "region": {
+                                "runtimeValue": {
+                                    "constant": "us-east1"
+                                }
+                            },
+                            "training_image": {
+                                "runtimeValue": {
+                                    "constant": "us-east1-docker.pkg.dev/creature-vision/creature-vis-training/training:latest"
+                                }
+                            }
+                        }
+                    },
+                    "taskInfo": {
+                        "name": "train-model"
+                    }
+                }
+            }
+        }
+    },
+    "schemaVersion": "2.1.0",
+    "sdkVersion": "kfp-2.10.1"
+}
