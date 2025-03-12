@@ -13,8 +13,8 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Train a machine learning model and save it to GCS.")
     parser.add_argument("--version", type=str,
-                        required=False, help="Version identifier for the model")
-    parser.add_argument("--previous_model_version", type=str,
+                        required=True, help="Version identifier for the model")
+    parser.add_argument("--previous_model_version", type=str, default=None,
                         required=False, help="Previous model version for stateful training")
     return parser.parse_args()
 
@@ -38,13 +38,11 @@ def main():
         "location": LOCATION,
         "staging_bucket": STAGING_BUCKET
     }
-    # Format the date as YYYYMMDD
-    # date_str = datetime.datetime.now().strftime("%Y%m%d")
-    date_str = "20250308"
+
     # Dataset preparation
     train_ds, val_ds, num_classes, class_names = create_training_dataset(
         bucket_name=BUCKET_NAME,
-        tfrecord_path=f"processed/weekly_{date_str}",
+        tfrecord_path=f"processed/{NEW_VERSION}",
         labels_path="processed/metadata",
         batch_size=BATCH_SIZE,
         validation_split=0.3

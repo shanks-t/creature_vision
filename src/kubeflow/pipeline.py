@@ -1,61 +1,26 @@
 import datetime
-
-from kfp import dsl
+from kfp.v2 import dsl
 from kfp import compiler
-from google.cloud import aiplatform as vertex_ai
 
-# Project Configuration
-PROJECT_ID = "creature-vision"
-REGION = "us-east1"
-PIPELINE_ROOT = f"gs://creature-vision-pipeline-artifacts"
-
-# Artifact Registry URIs (from Makefile)
-ARTIFACT_REGISTRY = f"{REGION}-docker.pkg.dev/{PROJECT_ID}"
-INFERENCE_IMAGE = f"{ARTIFACT_REGISTRY}/dog-prediction-app/inference:latest"
-TRAINING_IMAGE = f"{ARTIFACT_REGISTRY}/creature-vis-training/training:latest"
-PREPROCESSING_IMAGE = f"{ARTIFACT_REGISTRY}/creature-vis-preprocessing/preprocessing:latest"
-
-# Model Storage in GCS
-MODEL_BUCKET = "gs://tf_models_cv"
-
-# Step 1: Define Individual Components as Functions
-
-# Initialize Vertex AI to use the correct region
-vertex_ai.init(
-    project=PROJECT_ID,
-    location=REGION,
-    staging_bucket=PIPELINE_ROOT  # Ensures consistency between Vertex AI & GCS
-)
+# Define pipeline components
 
 
-@dsl.component(base_image="gcr.io/google.com/cloudsdktool/cloud-sdk:latest")
-def get_previous_model(bucket: str) -> str:
+@dsl.component(base_image="python:3.10", packages_to_install=["google-cloud-storage"])
+def get_previous_model(bucket_name: str) -> str:
     """Fetch the previous model version from GCS."""
-    import subprocess
+    from google.cloud import storage
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)  # ✅ Fix: Removed "gs://"
+    blobs = list(bucket.list_blobs(prefix="v-"))
 
-    cmd = f"gsutil ls {bucket}/ | grep -o 'v-[0-9]*-[0-9]*' | sort | tail -n 1"
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-
-    latest_model = result.stdout.strip()
-    print(f"Latest model version: {latest_model}")
-
-    return latest_model
-
-
-@dsl.container_component
-def run_dataflow(model_version: str):
-    """Runs the Dataflow Flex Template with the given model version."""
-    return dsl.ContainerSpec(
-        image="gcr.io/google.com/cloudsdktool/cloud-sdk:latest",
-        command=["gcloud"],
-        args=[
-            "dataflow", "flex-template", "run", "creature-vis-processing",
-            "--template-file-gcs-location=gs://dataflow-use1/templates/creature-vision-template.json",
-            "--region=us-east1",
-            "--parameters=max_files=1000",
-            f"--parameters=model_version={model_version}"
-        ]
+    model_versions = sorted(
+        [blob.name for blob in blobs if "v-" in blob.name],
+        reverse=True
     )
+
+    latest_model = model_versions[0] if model_versions else "None"
+    print(f"Latest model version: {latest_model}")
+    return latest_model
 
 
 @dsl.component(base_image="python:3.10")
@@ -65,104 +30,123 @@ def train_model(
     pipeline_root: str,
     project_id: str,
     region: str,
-    training_image: str
+    training_image: str,
 ):
     """Executes a Vertex AI Custom Training Job using a container."""
     from google.cloud import aiplatform
-
-    # Initialize Vertex AI
     aiplatform.init(project=project_id, location=region,
                     staging_bucket=pipeline_root)
 
-    # Create a Custom Training Job
     train_job = aiplatform.CustomContainerTrainingJob(
         display_name="train-creature-model",
         container_uri=training_image,
-        model_serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-9:latest"
     )
 
-    # Run Training
     train_job.run(
         model_display_name="creature-vision-model",
         args=[
             "--previous_model_version", previous_model_version,
             "--model_version", model_version
-        ]
+        ],
     )
 
 
 @dsl.container_component
-def build_inference_image(model_output_path: str, model_version: str):
+def run_dataflow(model_version: str, region: str, preprocessing_image: str):
+    """Runs the Dataflow Flex Template with the given model version."""
+    return dsl.ContainerSpec(
+        # ✅ Fix: Ensure preprocessing_image is constant at compile time
+        image=preprocessing_image,
+        command=["gcloud"],
+        args=[
+            "dataflow", "flex-template", "run", "creature-vis-processing",
+            "--template-file-gcs-location=gs://dataflow-use1/templates/creature-vision-template.json",
+            "--region", region,  # ✅ Fix: Now correctly passed as an argument
+            "--parameters=max_files=1000",
+            "--parameters", f"model_version={model_version}",
+        ],
+    )
+
+
+@dsl.container_component
+def build_inference_image(model_output_path: str, model_version: str, inference_image: str):
     """Builds and pushes the new inference container image."""
     return dsl.ContainerSpec(
         image="gcr.io/cloud-builders/docker",
         command=["bash", "-c"],
         args=[
-            f"""
-            echo "Building and pushing new inference container..."
-            docker build -t {INFERENCE_IMAGE} --build-arg MODEL_URI={model_output_path} --build-arg MODEL_VERSION={model_version} .
-            docker push {INFERENCE_IMAGE}
-            """
-        ]
+            "echo", "Building and pushing new inference container...",
+            "&&",
+            "docker", "build", "-t", inference_image,
+            "--build-arg", f"MODEL_URI={model_output_path}",
+            "--build-arg", f"MODEL_VERSION={model_version}",
+            "&&",
+            "docker", "push", inference_image
+        ],
     )
 
 
 @dsl.container_component
-def deploy_cloud_run():
+def deploy_cloud_run(region: str, inference_image: str):
     """Deploys the updated inference service to Cloud Run."""
     return dsl.ContainerSpec(
         image="gcr.io/google.com/cloudsdktool/cloud-sdk:latest",
         command=["gcloud"],
         args=[
             "run", "deploy", "dog-prediction-app",
-            "--image", INFERENCE_IMAGE,
-            "--region", REGION,
+            "--image", inference_image,
+            "--region", region,
             "--platform", "managed",
             "--allow-unauthenticated",
-        ]
+        ],
     )
 
 
-# Step 2: Define the Pipeline Using Correct Task Dependencies
 @dsl.pipeline(
-    name="creature-vision-pipeline",
-    pipeline_root=PIPELINE_ROOT,
+    name="creature-vision-pipeline"
 )
-def creature_vision_pipeline():
+def creature_vision_pipeline(
+    project_id: str,
+    region: str,
+    pipeline_root: str,
+    model_bucket: str,
+    inference_image: str,
+    training_image: str,
+    preprocessing_image: str,
+):
     """Pipeline that orchestrates Dataflow preprocessing, training, and Cloud Run deployment."""
 
-    # Define Global Model Version
-    date_str = datetime.datetime.now().strftime(
-        "%Y%m%d-%H%M")  # Unique timestamp-based version
+    # Define Model Version as a Timestamp
+    date_str = datetime.datetime.now().strftime("%Y%m%d-%H%M")
     model_version = f"v-{date_str}"
-    model_output_path = f"{MODEL_BUCKET}/{model_version}/{model_version}.keras"
+    model_output_path = f"{model_bucket}/{model_version}/{model_version}.keras"
 
-    # Step 1: Retrieve Previous Model Version
-    get_previous_model_task = get_previous_model(bucket=MODEL_BUCKET)
+    # ✅ Fix: Pass pipeline parameters correctly
+    get_previous_model_task = get_previous_model(bucket_name=model_bucket)
+    dataflow_task = run_dataflow(
+        model_version=model_version, region=region, preprocessing_image=preprocessing_image)
 
-    # Step 2: Run Dataflow with Model Version
-    dataflow_task = run_dataflow(model_version=model_version)
-
-    # Step 3: Train Model using the New Component
     train_model_task = train_model(
         model_version=model_version,
         previous_model_version=get_previous_model_task.output,
-        pipeline_root=PIPELINE_ROOT,
-        project_id=PROJECT_ID,
-        region=REGION,
-        training_image=TRAINING_IMAGE
+        pipeline_root=pipeline_root,
+        project_id=project_id,
+        region=region,
+        training_image=training_image,
     ).after(get_previous_model_task, dataflow_task)
 
-    # Step 4: Build and Push New Inference Container
     build_inference_image_task = build_inference_image(
-        model_output_path=model_output_path, model_version=model_version
+        model_output_path=model_output_path,
+        model_version=model_version,
+        inference_image=inference_image
     ).after(train_model_task)
 
-    # Step 5: Deploy to Cloud Run
-    deploy_cloud_run_task = deploy_cloud_run().after(build_inference_image_task)
+    deploy_cloud_run_task = deploy_cloud_run(
+        region=region, inference_image=inference_image
+    ).after(build_inference_image_task)
 
 
-# Step 3: Compile the Pipeline
+# ✅ Fix: Ensure pipeline_root is explicitly set
 compiler.Compiler().compile(
     pipeline_func=creature_vision_pipeline,
     package_path="creature_vision_pipeline.json"

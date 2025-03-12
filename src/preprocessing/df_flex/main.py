@@ -22,7 +22,7 @@ def run(argv=None):
     parser.add_argument(
         '--version',
         type=str,
-        default="",
+        required=True,
         help='version of the training run equal to date'
     )
 
