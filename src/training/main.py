@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import os
+import sys
 
 from google.cloud import aiplatform
 
@@ -10,6 +11,7 @@ from dataset import create_training_dataset
 
 def parse_args():
     """Parse command-line arguments for training."""
+    print(f"Raw sys.argv received: {sys.argv}")
     parser = argparse.ArgumentParser(
         description="Train a machine learning model and save it to GCS.")
     parser.add_argument("--version", type=str,
@@ -32,6 +34,10 @@ def main():
         "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local")
     model_gcs_path = args.previous_model_version
     NEW_VERSION = args.version
+
+    print(f"Starting training with version: {args.version}")
+    print(f"Previous model version: {args.previous_model_version}")
+
     experiment_config = {
         "experiment_name": f"{NEW_VERSION}",
         "project_id": PROJECT_ID,

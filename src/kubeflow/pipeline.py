@@ -117,7 +117,7 @@ def creature_vision_pipeline(
     """Pipeline that orchestrates Dataflow preprocessing, training, and Cloud Run deployment."""
 
     # Define Model Version as a Timestamp
-    date_str = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    date_str = datetime.datetime.now().strftime("%Y%m%d")
     model_version = f"v-{date_str}"
     model_output_path = f"{model_bucket}/{model_version}/{model_version}.keras"
 

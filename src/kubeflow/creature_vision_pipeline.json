@@ -215,7 +215,35 @@
       },
       "outputDefinitions": {
         "parameters": {
-          "Output": {
+          "output_model_version": {
+            "parameterType": "STRING"
+          }
+        }
+      }
+    },
+    "comp-run-custom-container-training-job": {
+      "executorLabel": "exec-run-custom-container-training-job",
+      "inputDefinitions": {
+        "parameters": {
+          "args": {
+            "parameterType": "LIST"
+          },
+          "container_uri": {
+            "parameterType": "STRING"
+          },
+          "display_name": {
+            "parameterType": "STRING"
+          },
+          "location": {
+            "parameterType": "STRING"
+          },
+          "model_display_name": {
+            "parameterType": "STRING"
+          },
+          "project": {
+            "parameterType": "STRING"
+          },
+          "staging_bucket": {
             "parameterType": "STRING"
           }
         }
@@ -262,7 +290,27 @@
             "sh",
             "-ec",
             "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str) -> str:\n    \"\"\"Fetch the previous model version from GCS.\"\"\"\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v-\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v-\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n    print(f\"Latest model version: {latest_model}\")\n    return latest_model\n\n"
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str, output_model_version: dsl.OutputPath(str)):\n    \"\"\"Fetch the previous model version from GCS and save it to a file.\"\"\"\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v-\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v-\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n\n    with open(output_model_version, \"w\") as f:\n        f.write(latest_model)\n\n"
+          ],
+          "image": "python:3.10"
+        }
+      },
+      "exec-run-custom-container-training-job": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "run_custom_container_training_job"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef run_custom_container_training_job(\n    project: str,\n    location: str,\n    display_name: str,\n    container_uri: str,\n    staging_bucket: str,\n    model_display_name: str,\n    args: list\n):\n    from google.cloud import aiplatform  # Import inside function\n    aiplatform.init(project=project, location=location,\n                    staging_bucket=staging_bucket)\n\n    job = aiplatform.CustomContainerTrainingJob(\n        display_name=display_name,\n        container_uri=container_uri,\n        model_serving_container_image_uri='us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-3:latest'\n    )\n\n    model = job.run(\n        args=args,\n        replica_count=1,\n        model_display_name=model_display_name,\n        sync=True\n    )\n    return model\n\n"
           ],
           "image": "python:3.10"
         }
@@ -283,9 +331,6 @@
           "componentRef": {
             "name": "comp-dataflow-flex-template"
           },
-          "dependentTasks": [
-            "get-previous-model"
-          ],
           "inputs": {
             "parameters": {
               "container_spec_gcs_path": {
@@ -296,6 +341,13 @@
                   "constant": "creature-vis-training"
                 }
               },
+              "launch_options": {
+                "runtimeValue": {
+                  "constant": {
+                    "enable_preflight_validation": "false"
+                  }
+                }
+              },
               "location": {
                 "componentInputParameter": "region"
               },
@@ -303,14 +355,8 @@
                 "runtimeValue": {
                   "constant": {
                     "max_files": "100",
-                    "version": "{{$.inputs.parameters['pipelinechannel--get-previous-model-Output']}}"
+                    "version": "v-20250312-1425"
                   }
-                }
-              },
-              "pipelinechannel--get-previous-model-Output": {
-                "taskOutputParameter": {
-                  "outputParameterKey": "Output",
-                  "producerTask": "get-previous-model"
                 }
               },
               "service_account_email": {
@@ -338,6 +384,62 @@
           },
           "taskInfo": {
             "name": "get-previous-model"
+          }
+        },
+        "run-custom-container-training-job": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-run-custom-container-training-job"
+          },
+          "dependentTasks": [
+            "dataflow-flex-template",
+            "get-previous-model"
+          ],
+          "inputs": {
+            "parameters": {
+              "args": {
+                "runtimeValue": {
+                  "constant": [
+                    "--version=v-20250312-1425",
+                    "--previous_model_version",
+                    "{{$.inputs.parameters['pipelinechannel--get-previous-model-output_model_version']}}"
+                  ]
+                }
+              },
+              "container_uri": {
+                "componentInputParameter": "training_image"
+              },
+              "display_name": {
+                "runtimeValue": {
+                  "constant": "creature-vision-training"
+                }
+              },
+              "location": {
+                "componentInputParameter": "region"
+              },
+              "model_display_name": {
+                "runtimeValue": {
+                  "constant": "creature-vision-model"
+                }
+              },
+              "pipelinechannel--get-previous-model-output_model_version": {
+                "taskOutputParameter": {
+                  "outputParameterKey": "output_model_version",
+                  "producerTask": "get-previous-model"
+                }
+              },
+              "project": {
+                "componentInputParameter": "project_id"
+              },
+              "staging_bucket": {
+                "componentInputParameter": "pipeline_root"
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "run-custom-container-training-job"
           }
         }
       }
