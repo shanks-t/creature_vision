@@ -1,47 +1,128 @@
-# Continuous Retraining Project
+# Creature Vision: Continuous Retraining ML Pipeline
 
-This project demonstrates a 'data flywheel' effect using a simulated user interaction system with a machine learning model. It leverages various technologies to create a continuous learning and improvement cycle.
+This project implements a **continual learning pipeline** for dog breed classification using **MobileNetV3-Small**. The system employs **automated data collection, preprocessing, training, and deployment**, ensuring that the model continuously improves as new data is accumulated.
 
-## Overview
+## **Overview**
 
-The Continuous Retraining Project uses the free Dog API to simulate user interactions, feeding data into a containerized MobileNetV3 model running on Cloud Run. The system collects performance metrics and new training data, enabling continuous model improvement.
+Creature Vision fetches dog images from a **free API**, processes them through an **inference service**, logs **accuracy and latency metrics**, and stores images for **future training**. The system then preprocesses the data, retrains the model on new data, and redeploys it, completing a **self-improving ML pipeline**.
 
-## Key Features
+## **Key Features**
 
-- **Simulated User Interactions**: Utilizes the free Dog API to generate realistic user interaction data.
-- **Containerized ML Model**: Runs a lightweight MobileNetV3 model in a container on Cloud Run for efficient and scalable predictions.
-- **Performance Tracking**: Outputs model performance metrics to BigQuery for detailed analysis.
-- **Metric Visualization**: Integrates with Grafana using a BigQuery data source to visualize model performance over time.
-- **Automated Data Collection**: Saves new training data (images and labels) from the Dog API for future model fine-tuning.
-- **Threshold-based Retraining**: Initiates model fine-tuning once a specified volume of new training data is accumulated.
+- **Continuous Learning**: The model is automatically fine-tuned as new labeled data accumulates.
+- **Containerized Deployment**: All services (Inference, Preprocessing, Training) are **Dockerized** and deployed in **Cloud Run**.
+- **Data-Driven Decision Making**: Metrics (accuracy, latency) are stored in **BigQuery** for monitoring.
+- **Scalable Data Processing**: Uses **Apache Beam + Dataflow** to preprocess images into **TFRecords**.
+- **Automated Training & Deployment**: **Kubeflow Pipelines + Vertex AI** orchestrate **continual model updates**.
 
-## Architecture
+## **Architecture**
 
-1. **Data Source**: [Free Dog API](https://dog.ceo/dog-api/about)
-2. **Model Hosting**: Cloud Run (containerized MobileNetV3)
-3. **Metric Storage**: BigQuery
-4. **Visualization**: Grafana
-5. **Data Storage**: Cloud Storage (for new training data)
+```mermaid
+graph TD;
+    subgraph Data Ingestion
+        A[Inference Service] -->|Fetches image| B[Free Dog Image API]
+        A -->|Logs predictions| C[BigQuery Metrics]
+        A -->|Stores images & labels| D[Raw Data - GCS Bucket]
+    end
 
-## Workflow
+    subgraph Preprocessing
+        D -->|Triggers Dataflow Job| E[Preprocessing Service]
+        E -->|Transforms images & labels| F[TFRecords - Processed GCS Folder]
+    end
 
-1. The system fetches dog images and labels from the Dog API.
-2. These images are sent to the MobileNetV3 model hosted on Cloud Run for prediction.
-3. Prediction results and actual labels are compared to generate performance metrics.
-4. Metrics are stored in BigQuery for analysis.
-5. Grafana visualizes the performance metrics from BigQuery.
-6. New images and labels are saved to Cloud Storage for future model fine-tuning.
-7. When the volume of new data reaches a predefined threshold, the model is retrained to improve its performance.
+    subgraph Training
+        F -->|Feeds TFRecords| G[Training Service]
+        G -->|Retrains model: MobileNetV3-Small| H[New Model Version - GCS]
+        G -->|Logs metrics| I[TensorBoard & Vertex AI Experiments]
+    end
 
-## Getting Started
+    subgraph Deployment
+        H -->|Triggers redeployment| J[Inference Service - Updated]
+    end
 
-TODO: (Include instructions for setting up and running the project)
+    subgraph Orchestration
+        K[Kubeflow + Vertex AI Pipelines] -->|Manages Workflow| A
+        K -->|Manages Workflow| E
+        K -->|Manages Workflow| G
+        K -->|Deploys Model| J
+    end
 
-## Monitoring
-- Once your gcp service account key is created, downloaded to your host machine, you can mount the key to you grafana container
-- The dashboards and datasource configs are stored in grafana monitoring dir. mount these dirs as well, and the 'creature-vision' dashbpoard viz will automatically startup
-![accuracy](./docs/grafana.png)
+    subgraph Infrastructure
+        L[All Services Containerized with Docker]
+    end
 
+    style A fill:#ffcc00,stroke:#333,stroke-width:2px;
+    style J fill:#ffcc00,stroke:#333,stroke-width:2px;
+    style K fill:#66ccff,stroke:#333,stroke-width:2px;
+    style L fill:#ff6666,stroke:#333,stroke-width:2px;
+```
 
-## Fine-tuning
-- https://www.tensorflow.org/tutorials/images/transfer_learning
+## **Workflow**
+
+1. **Inference Service** fetches images from the **Dog API** and logs accuracy & latency metrics in **BigQuery**.
+2. It also saves the **raw images & labels** to **Cloud Storage**.
+3. **Dataflow Preprocessing** converts raw images into **TFRecords**.
+4. **Training Service** loads TFRecords and **re-trains the MobileNetV3-Small model**.
+5. Training logs are stored in **Vertex AI Experiments & TensorBoard**.
+6. The **new model version** is stored in **GCS**.
+7. **Kubeflow Pipelines** redeploy the **Inference Service** with the **updated model**.
+8. The cycle repeats, continuously improving model accuracy over time.
+
+## **Technology Stack**
+
+| Component           | Service Used                      |
+|--------------------|--------------------------------|
+| **Inference**      | Cloud Run + MobileNetV3-Small |
+| **Preprocessing**  | Apache Beam + Dataflow        |
+| **Training**       | Vertex AI Training            |
+| **Storage**        | Cloud Storage (GCS)           |
+| **Monitoring**     | BigQuery + TensorBoard        |
+| **Orchestration**  | Kubeflow Pipelines + Vertex AI Pipelines |
+| **Containerization** | Docker + Artifact Registry  |
+
+## **Getting Started**
+
+### **Prerequisites**
+- Google Cloud SDK installed and authenticated
+- Docker installed
+- Kubeflow Pipelines setup on GCP
+
+### **Setup Instructions**
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/your-repo/creature-vision.git
+   cd creature-vision
+   ```
+2. Build & push Docker images:
+   ```sh
+   make build && make push
+   ```
+3. Deploy the system:
+   ```sh
+   make deploy
+   ```
+
+## **Monitoring & Visualization**
+
+- **BigQuery** stores model accuracy, latency, and retraining metrics.
+- **Grafana** visualizes BigQuery metrics:
+  ```sh
+  docker-compose up grafana
+  ```
+- **TensorBoard** logs training performance:
+  ```sh
+  tensorboard --logdir=gs://your-tensorboard-logs/
+  ```
+
+![Model Accuracy Visualization](./docs/grafana.png)
+
+## **Fine-Tuning & Continuous Learning**
+
+- **Model is retrained only when new data volume surpasses a threshold**.
+- **Fine-tuning follows best practices for transfer learning**:
+  - Base Model: **MobileNetV3-Small**
+  - Optimizer: **Adam with cosine decay learning rate**
+  - Dataset Augmentations: **Random rotation, horizontal flip, brightness adjustments**
+
+### **Reference**
+- [TensorFlow Fine-Tuning Guide](https://www.tensorflow.org/tutorials/images/transfer_learning)
+
