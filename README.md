@@ -19,41 +19,41 @@ Creature Vision fetches dog images from a **free API**, processes them through a
 ```mermaid
 graph TD;
     subgraph Data Ingestion
-        A[Inference Service] -->|Fetches image| B[Free Dog Image API]
-        A -->|Logs predictions| C[BigQuery Metrics]
-        A -->|Stores images & labels| D[Raw Data - GCS Bucket]
+        A[**Inference Service**] -->|Fetches image| B[**Free Dog Image API**]
+        A -->|Logs predictions| C[**BigQuery Metrics**]
+        A -->|Stores images & labels| D[**Raw Data - GCS Bucket**]
     end
 
     subgraph Preprocessing
-        D -->|Triggers Dataflow Job| E[Preprocessing Service]
-        E -->|Transforms images & labels| F[TFRecords - Processed GCS Folder]
+        D -->|Triggers Dataflow Job| E[**Preprocessing Service**]
+        E -->|Transforms images & labels| F[**TFRecords - Processed GCS Folder**]
     end
 
     subgraph Training
-        F -->|Feeds TFRecords| G[Training Service]
-        G -->|Retrains model: MobileNetV3-Small| H[New Model Version - GCS]
-        G -->|Logs metrics| I[TensorBoard & Vertex AI Experiments]
+        F -->|Feeds TFRecords| G[**Training Service**]
+        G -->|Retrains model: MobileNetV3-Small| H[**New Model Version - GCS**]
+        G -->|Logs metrics| I[**TensorBoard & Vertex AI Experiments**]
     end
 
     subgraph Deployment
-        H -->|Triggers redeployment| J[Inference Service - Updated]
+        H -->|Triggers redeployment| J[**Inference Service - Updated**]
     end
 
     subgraph Orchestration
-        K[Kubeflow + Vertex AI Pipelines] -->|Manages Workflow| A
+        K[**Kubeflow + Vertex AI Pipelines**] -->|Manages Workflow| A
         K -->|Manages Workflow| E
         K -->|Manages Workflow| G
         K -->|Deploys Model| J
     end
 
     subgraph Infrastructure
-        L[All Services Containerized with Docker]
+        L[**All Services Containerized with Docker**]
     end
 
-    style A fill:#ffcc00,stroke:#333,stroke-width:2px;
-    style J fill:#ffcc00,stroke:#333,stroke-width:2px;
-    style K fill:#66ccff,stroke:#333,stroke-width:2px;
-    style L fill:#ff6666,stroke:#333,stroke-width:2px;
+    style A fill:#ffeb99,stroke:#333,stroke-width:2px,font-weight:bold;
+    style J fill:#ffeb99,stroke:#333,stroke-width:2px,font-weight:bold;
+    style K fill:#99ccff,stroke:#333,stroke-width:2px,font-weight:bold;
+    style L fill:#ff9999,stroke:#333,stroke-width:2px,font-weight:bold;
 ```
 
 ## **Workflow**
