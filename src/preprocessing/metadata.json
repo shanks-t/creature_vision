@@ -12,6 +12,15 @@
             ]
         },
         {
+            "name": "version",
+            "label": "Model Version",
+            "helpText": "Version identifier for the model (e.g., v-20240312)",
+            "isOptional": false,
+            "regexes": [
+                "^[a-zA-Z0-9_-]+$"
+            ]
+        },
+        {
             "name": "random_seed",
             "label": "Random seed for reproducibility",
             "helpText": "Random seed for reproducibility",

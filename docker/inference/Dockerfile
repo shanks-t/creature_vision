@@ -9,11 +9,11 @@ ENV MODEL_VERSION=${MODEL_VERSION}
 
 WORKDIR /app
 
-COPY ../../src/inference/requirements.txt .
+COPY requirements.txt requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ../../src/inference/ src/inference/
+COPY . . 
 
 ENV PYTHONPATH="/app/src:${PYTHONPATH}"
 CMD ["python", "-m", "src.inference.main"]

@@ -121,7 +121,7 @@ class ProcessDataPipeline:
         self.logger = setup_logger('ProcessDataPipeline')
 
     @log_execution_time(logger)
-    def run_pipeline(self, use_dataflow: bool = True, region: str = 'us-east1', max_files: int = None, random_seed: int = None,
+    def run_pipeline(self, version: str, use_dataflow: bool = True, region: str = 'us-east1', max_files: int = None, random_seed: int = None,
                      max_num_workers: int = 2, number_of_worker_harness_threads: int = 4, machine_type: str = 'n1-standard-2'):
         """Runs the Apache Beam pipeline to process images and create TFRecords"""
 
@@ -136,8 +136,8 @@ class ProcessDataPipeline:
         blob = bucket.blob("processed/metadata/label_map.json")
         label_map = json.loads(blob.download_as_text())
 
-        weekly_folder = f'weekly_{datetime.now().strftime("%Y%m%d")}'
-        output_path = f'gs://{self.dataset_bucket_name}/processed/{weekly_folder}/data'
+        # weekly_folder = f'weekly_{datetime.now().strftime("%Y%m%d")}'
+        output_path = f'gs://{self.dataset_bucket_name}/processed/{version}/data'
         self.logger.info(f"Output path: {output_path}")
 
         # **Step 3**: Configure Beam pipeline options

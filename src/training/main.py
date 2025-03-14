@@ -1,40 +1,61 @@
-from model import setup_model, run_training, load_or_create_model, save_model, compute_class_weight
-from dataset import create_training_dataset
-from google.cloud import aiplatform
+import argparse
 import datetime
 import os
+import sys
+
+from google.cloud import aiplatform
+
+from model import setup_model, run_training, load_or_create_model, save_model, compute_class_weight
+from dataset import create_training_dataset
+
+
+def parse_args():
+    """Parse command-line arguments for training."""
+    print(f"Raw sys.argv received: {sys.argv}")
+    parser = argparse.ArgumentParser(
+        description="Train a machine learning model and save it to GCS.")
+    parser.add_argument("--version", type=str,
+                        required=True, help="Version identifier for the model")
+    parser.add_argument("--previous_model_version", type=str, default=None,
+                        required=False, help="Previous model version for stateful training")
+    return parser.parse_args()
 
 
 def main():
+    args = parse_args()
     # Environment configuration
     BUCKET_NAME = os.getenv("TRAINING_BUCKET", "creature-vision-training-set")
-    NUM_EXAMPLES = int(os.getenv("NUM_EXAMPLES", "32"))
-    BATCH_SIZE = int(os.getenv("BATCH_SIZE", "8"))
+    BATCH_SIZE = int(os.getenv("BATCH_SIZE", "16"))
     PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "creature-vision")
     LOCATION = os.getenv("CLOUD_LOCATION", "us-central1")
     MODEL_BUCKET = os.getenv("MODEL_BUCKET", "tf_models_cv")
     STAGING_BUCKET = os.getenv("STAGING_BUCKET", "creture-vision-ml-artifacts")
-    model_gcs_path = "gs://tf_models_cv/feb-22-2025/feb-22-2025.keras"
-    NEW_VERSION = f"{datetime.datetime.now().strftime('%b-%d-%Y')}".lower()
+    AIP_TENSORBOARD_LOG_DIR = os.getenv(
+        "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local")
+    model_gcs_path = args.previous_model_version
+    NEW_VERSION = args.version
+
+    print(f"Starting training with version: {args.version}")
+    print(f"Previous model version: {args.previous_model_version}")
+
     experiment_config = {
         "experiment_name": f"{NEW_VERSION}",
         "project_id": PROJECT_ID,
         "location": LOCATION,
         "staging_bucket": STAGING_BUCKET
     }
-    # Format the date as YYYYMMDD
-    date_str = datetime.datetime.now().strftime("%Y%m%d")
+
     # Dataset preparation
     train_ds, val_ds, num_classes, class_names = create_training_dataset(
         bucket_name=BUCKET_NAME,
-        tfrecord_path=f"processed/weekly_{date_str}",
+        tfrecord_path=f"processed/{NEW_VERSION}",
         labels_path="processed/metadata",
         batch_size=BATCH_SIZE,
         validation_split=0.3
     )
 
     # Model initialization
-    model = load_or_create_model(num_classes, model_gcs_path=None)
+    model = load_or_create_model(num_classes, model_gcs_path=model_gcs_path)
     # Initialize Vertex AI experiment
     aiplatform.init(
         experiment=experiment_config["experiment_name"],

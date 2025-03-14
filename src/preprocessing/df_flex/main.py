@@ -19,6 +19,12 @@ def run(argv=None):
         default=42,
         help='Random seed for reproducibility'
     )
+    parser.add_argument(
+        '--version',
+        type=str,
+        required=True,
+        help='version of the training run equal to date'
+    )
 
     # Parse known args first, then pass remaining args to PipelineOptions
     known_args, pipeline_args = parser.parse_known_args(argv)
@@ -33,6 +39,7 @@ def run(argv=None):
     )
 
     pipeline.run_pipeline(
+        version=known_args.version,
         use_dataflow=True,
         region=pipeline_options.get_all_options().get('region', 'us-east1'),
         max_files=known_args.max_files,
