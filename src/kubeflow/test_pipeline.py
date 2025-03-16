@@ -1,15 +1,14 @@
 import datetime
-import uuid
 from kfp import dsl
 from kfp import compiler
 from google.cloud import aiplatform
 from google_cloud_pipeline_components.v1.dataflow import DataflowFlexTemplateJobOp
 
 
-# Define pipeline components
+# Simplified get_previous_model component that returns a string
 @dsl.component(base_image="python:3.10", packages_to_install=["google-cloud-storage"])
-def get_previous_model(bucket_name: str, output_model_version: dsl.OutputPath(str)):
-    """Fetch the previous model version from GCS and save it to a file."""
+def get_previous_model(bucket_name: str) -> str:
+    """Fetch the previous model version from GCS and return it as a string."""
     from google.cloud import storage
     client = storage.Client()
     bucket = client.bucket(bucket_name)
@@ -21,12 +20,11 @@ def get_previous_model(bucket_name: str, output_model_version: dsl.OutputPath(st
     )
 
     latest_model = model_versions[0] if model_versions else "None"
-
-    with open(output_model_version, "w") as f:
-        f.write(latest_model)
+    return latest_model  # Directly returning the value
 
 
-@dsl.component(base_image='python:3.10', packages_to_install=['google-cloud-aiplatform'])
+# Training job component
+@dsl.component(base_image="python:3.10", packages_to_install=["google-cloud-aiplatform"])
 def run_custom_container_training_job(
     project: str,
     location: str,
@@ -34,16 +32,28 @@ def run_custom_container_training_job(
     container_uri: str,
     staging_bucket: str,
     model_display_name: str,
+    previous_model_version: str,
+    model_version: str,
     args: list
 ):
-    from google.cloud import aiplatform  # Import inside function
+    import os
+    from google.cloud import aiplatform
+
+    # Disable GPU
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+    args.append("--version")
+    args.append(model_version)
+    args.append("--previous_model_version")
+    args.append(previous_model_version)
+
     aiplatform.init(project=project, location=location,
                     staging_bucket=staging_bucket)
 
     job = aiplatform.CustomContainerTrainingJob(
         display_name=display_name,
         container_uri=container_uri,
-        model_serving_container_image_uri='us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-3:latest'
+        model_serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-3:latest"
     )
 
     model = job.run(
@@ -55,6 +65,7 @@ def run_custom_container_training_job(
     return model
 
 
+# Pipeline definition
 @dsl.pipeline(
     name="creature-vision-pipeline",
     description="Pipeline that orchestrates Dataflow preprocessing, training, and Cloud Run deployment."
@@ -70,7 +81,7 @@ def creature_vision_pipeline(
     gcs_template_path: str
 ):
     """Kubeflow Pipeline that runs a Dataflow Flex Template job after retrieving the previous model."""
-    date_str = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    date_str = datetime.datetime.now().strftime("%Y%m%d")
     model_version = f"v-{date_str}"
 
     # Task to get the previous model version
@@ -83,9 +94,10 @@ def creature_vision_pipeline(
         job_name=f"creature-vis-training",
         parameters={
             "version": model_version,
-            "max_files": "100"
+            "max_files": "1000"
         },
         service_account_email=service_account,
+        wait_until_finish=True,
         launch_options={"enable_preflight_validation": "false"}
     )
 
@@ -97,10 +109,10 @@ def creature_vision_pipeline(
         container_uri=training_image,
         staging_bucket=pipeline_root,
         model_display_name="creature-vision-model",
-        args=[
-            f"--version={model_version}",
-            f"--previous_model_version", get_previous_model_task.output
-        ]
+        # Directly passing the string output
+        previous_model_version=get_previous_model_task.output,
+        model_version=model_version,
+        args=[]
     ).after(dataflow_task)
 
 

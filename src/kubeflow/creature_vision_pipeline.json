@@ -215,7 +215,7 @@
       },
       "outputDefinitions": {
         "parameters": {
-          "output_model_version": {
+          "Output": {
             "parameterType": "STRING"
           }
         }
@@ -238,6 +238,12 @@
             "parameterType": "STRING"
           },
           "model_display_name": {
+            "parameterType": "STRING"
+          },
+          "model_version": {
+            "parameterType": "STRING"
+          },
+          "previous_model_version": {
             "parameterType": "STRING"
           },
           "project": {
@@ -290,7 +296,7 @@
             "sh",
             "-ec",
             "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str, output_model_version: dsl.OutputPath(str)):\n    \"\"\"Fetch the previous model version from GCS and save it to a file.\"\"\"\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v-\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v-\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n\n    with open(output_model_version, \"w\") as f:\n        f.write(latest_model)\n\n"
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str) -> str:\n    \"\"\"Fetch the previous model version from GCS and return it as a string.\"\"\"\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v-\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v-\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n    return latest_model  # Directly returning the value\n\n"
           ],
           "image": "python:3.10"
         }
@@ -310,7 +316,7 @@
             "sh",
             "-ec",
             "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef run_custom_container_training_job(\n    project: str,\n    location: str,\n    display_name: str,\n    container_uri: str,\n    staging_bucket: str,\n    model_display_name: str,\n    args: list\n):\n    from google.cloud import aiplatform  # Import inside function\n    aiplatform.init(project=project, location=location,\n                    staging_bucket=staging_bucket)\n\n    job = aiplatform.CustomContainerTrainingJob(\n        display_name=display_name,\n        container_uri=container_uri,\n        model_serving_container_image_uri='us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-3:latest'\n    )\n\n    model = job.run(\n        args=args,\n        replica_count=1,\n        model_display_name=model_display_name,\n        sync=True\n    )\n    return model\n\n"
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef run_custom_container_training_job(\n    project: str,\n    location: str,\n    display_name: str,\n    container_uri: str,\n    staging_bucket: str,\n    model_display_name: str,\n    previous_model_version: str,\n    model_version: str,\n    args: list\n):\n    import os\n    from google.cloud import aiplatform\n\n    # Disable GPU\n    os.environ[\"CUDA_VISIBLE_DEVICES\"] = \"-1\"\n\n    args.append(\"--version\")\n    args.append(model_version)\n    args.append(\"--previous_model_version\")\n    args.append(previous_model_version)\n\n    aiplatform.init(project=project, location=location,\n                    staging_bucket=staging_bucket)\n\n    job = aiplatform.CustomContainerTrainingJob(\n        display_name=display_name,\n        container_uri=container_uri,\n        model_serving_container_image_uri=\"us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-3:latest\"\n    )\n\n    model = job.run(\n        args=args,\n        replica_count=1,\n        model_display_name=model_display_name,\n        sync=True\n    )\n    return model\n\n"
           ],
           "image": "python:3.10"
         }
@@ -354,8 +360,8 @@
               "parameters": {
                 "runtimeValue": {
                   "constant": {
-                    "max_files": "100",
-                    "version": "v-20250312-1425"
+                    "max_files": "1000",
+                    "version": "v-20250315"
                   }
                 }
               },
@@ -401,11 +407,7 @@
             "parameters": {
               "args": {
                 "runtimeValue": {
-                  "constant": [
-                    "--version=v-20250312-1425",
-                    "--previous_model_version",
-                    "{{$.inputs.parameters['pipelinechannel--get-previous-model-output_model_version']}}"
-                  ]
+                  "constant": []
                 }
               },
               "container_uri": {
@@ -424,9 +426,14 @@
                   "constant": "creature-vision-model"
                 }
               },
-              "pipelinechannel--get-previous-model-output_model_version": {
+              "model_version": {
+                "runtimeValue": {
+                  "constant": "v-20250315"
+                }
+              },
+              "previous_model_version": {
                 "taskOutputParameter": {
-                  "outputParameterKey": "output_model_version",
+                  "outputParameterKey": "Output",
                   "producerTask": "get-previous-model"
                 }
               },

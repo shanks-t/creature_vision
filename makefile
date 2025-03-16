@@ -29,7 +29,7 @@ endif
 
 # Image Tag
 IMAGE_TAG := ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${APP_NAME}/${SERVICE}:${VERSION}
-
+TAR_FILE=${SERVICE}.tar  # Define the tar file for saving the image
 # Dataflow parameters
 MAXFILES ?= 500
 RANDOM_SEED ?= 42
@@ -70,14 +70,31 @@ run-local:
 	docker-compose -f docker/$(SERVICE)/docker-compose.local.yaml up && \
 	docker compose -f docker/$(SERVICE)/docker-compose.local.yaml rm -fsv
 
-build-push: auth-registry
-	docker buildx build --no-cache -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
-		--platform linux/amd64 \
-		-t ${IMAGE_TAG} \
-		--push
-
+# Authenticate to Artifact Registry
 auth-registry:
 	gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+# Build image without pushing (disable BuildKit to avoid timeout issues)
+build:
+	DOCKER_BUILDKIT=0 docker build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
+		--platform linux/amd64 \
+		-t ${IMAGE_TAG}
+
+# Save the built image as a .tar file
+save:
+	docker save -o ${TAR_FILE} ${IMAGE_TAG}
+
+# Load the image from the .tar file and push it
+load-push: auth-registry
+	docker load -i ${TAR_FILE}
+	docker push ${IMAGE_TAG}
+
+# Clean up the local .tar file
+clean:
+	rm -f ${TAR_FILE}
+
+# Run all steps in one command
+build-push: build save load-push clean
 
 push-image: auth-registry
 	docker tag ${APP_NAME}:${VERSION} ${IMAGE_TAG}

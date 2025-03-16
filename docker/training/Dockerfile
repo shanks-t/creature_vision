@@ -1,22 +1,11 @@
-FROM python:3.10.12-slim
+# Use Google's pre-built TensorFlow CPU image for Vertex AI
+FROM gcr.io/deeplearning-platform-release/tf2-cpu:latest
 
-ENV PYTHONUNBUFFERED=1
+# Set working directory inside the container
 WORKDIR /app
 
-# Copy and install requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
+# Copy your training script and necessary files into the container
 COPY . .
-COPY entrypoint.sh /
 
-RUN chmod +x /entrypoint.sh
-
-ENV PYTHONPATH="/app/src:${PYTHONPATH}"
-
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -c "import os; exit(0 if os.path.exists('/tmp/healthy') else 1)"
-
-ENTRYPOINT ["/entrypoint.sh"]
+# Run the training script
 CMD ["python", "-m", "main"]

@@ -85,4 +85,4 @@ def create_training_dataset(
         batch_size).prefetch(tf.data.AUTOTUNE)
     val_ds = val_ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
-    return train_ds, val_ds, num_classes, class_names
+    return train_ds, val_ds, num_classes, class_names, label_map
