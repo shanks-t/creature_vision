@@ -1,6 +1,10 @@
+import time
 import datetime
+
 from kfp import dsl
 from kfp import compiler
+
+
 from google.cloud import aiplatform
 from google_cloud_pipeline_components.v1.dataflow import DataflowFlexTemplateJobOp
 
@@ -23,18 +27,71 @@ def get_previous_model(bucket_name: str) -> str:
     return latest_model  # Directly returning the value
 
 
-# Training job component
+@dsl.component(base_image="python:3.10", packages_to_install=["google-api-python-client"])
+def wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_interval: int = 30, timeout: int = 1800):
+    """
+    Polls the Dataflow job status every `poll_interval` seconds until it reaches a terminal state
+    or the `timeout` is reached.
+    """
+    from googleapiclient.discovery import build
+
+    dataflow = build('dataflow', 'v1b3')
+    elapsed_time = 0
+    job_id = None
+
+    # Retrieve the job ID based on the job name
+    request = dataflow.projects().locations().jobs().list(
+        projectId=project_id, location=region)
+    while request is not None:
+        response = request.execute()
+        for job in response.get('jobs', []):
+            if job['name'] == job_name:
+                job_id = job['id']
+                break
+        request = dataflow.projects().locations().jobs().list_next(
+            previous_request=request, previous_response=response)
+        if job_id:
+            break
+
+    if not job_id:
+        raise ValueError(f"No job found with name {job_name}")
+
+    while elapsed_time < timeout:
+        job = dataflow.projects().locations().jobs().get(
+            projectId=project_id,
+            location=region,
+            jobId=job_id
+        ).execute()
+
+        state = job.get('currentState', 'UNKNOWN')
+        print(f"Dataflow job {job_id} is in state: {state}")
+
+        if state == 'JOB_STATE_DONE':
+            print(f"Dataflow job {job_id} completed successfully.")
+            return
+        elif state in ['JOB_STATE_FAILED', 'JOB_STATE_CANCELLED']:
+            raise RuntimeError(
+                f"Dataflow job {job_id} failed with state: {state}")
+
+        time.sleep(poll_interval)
+        elapsed_time += poll_interval
+
+    raise TimeoutError(
+        f"Dataflow job {job_id} did not complete within the allotted time of {timeout} seconds.")
+
+
 @dsl.component(base_image="python:3.10", packages_to_install=["google-cloud-aiplatform"])
-def run_custom_container_training_job(
+def run_custom_python_package_training_job(
     project: str,
     location: str,
     display_name: str,
-    container_uri: str,
+    python_package_gcs_uri: str,  # GCS path to training package
+    python_module: str,
     staging_bucket: str,
     model_display_name: str,
     previous_model_version: str,
     model_version: str,
-    args: list
+    service_account: str
 ):
     import os
     from google.cloud import aiplatform
@@ -42,27 +99,29 @@ def run_custom_container_training_job(
     # Disable GPU
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-    args.append("--version")
-    args.append(model_version)
-    args.append("--previous_model_version")
-    args.append(previous_model_version)
+    # Define arguments for training script
+    args = [
+        "--version", model_version,
+        "--previous_model_version", previous_model_version
+    ]
 
     aiplatform.init(project=project, location=location,
                     staging_bucket=staging_bucket)
 
-    job = aiplatform.CustomContainerTrainingJob(
+    job = aiplatform.CustomPythonPackageTrainingJob(
         display_name=display_name,
-        container_uri=container_uri,
+        python_package_gcs_uri=python_package_gcs_uri,
+        python_module_name=python_module,
         model_serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-3:latest"
     )
 
-    model = job.run(
+    job.run(
         args=args,
+        service_account=service_account,
         replica_count=1,
+        machine_type="e2-highmem-4",
         model_display_name=model_display_name,
-        sync=True
     )
-    return model
 
 
 # Pipeline definition
@@ -76,7 +135,7 @@ def creature_vision_pipeline(
     pipeline_root: str,
     model_bucket: str,
     inference_image: str,
-    training_image: str,
+    python_package_gcs_uri: str,
     service_account: str,
     gcs_template_path: str
 ):
@@ -87,33 +146,41 @@ def creature_vision_pipeline(
     # Task to get the previous model version
     get_previous_model_task = get_previous_model(bucket_name=model_bucket)
 
-    # Define the Dataflow task
+   # Define the Dataflow task
+    df_job_name = f"creature-vis-training-{date_str}"
     dataflow_task = DataflowFlexTemplateJobOp(
         location=region,
         container_spec_gcs_path=gcs_template_path,
-        job_name=f"creature-vis-training",
+        job_name=df_job_name,
         parameters={
             "version": model_version,
             "max_files": "1000"
         },
         service_account_email=service_account,
-        wait_until_finish=True,
-        launch_options={"enable_preflight_validation": "false"}
+        launch_options={"enable_preflight_validation": "false"},
+    )
+
+    # Wait for Dataflow job to complete
+    wait_task = wait_for_dataflow_job(
+        project_id=project_id,
+        region=region,
+        job_name=df_job_name
     )
 
     # Define the Custom Container Training task
-    training_task = run_custom_container_training_job(
+    training_task = run_custom_python_package_training_job(
         project=project_id,
         location=region,
         display_name="creature-vision-training",
-        container_uri=training_image,
+        python_package_gcs_uri=python_package_gcs_uri,
+        python_module="main",
         staging_bucket=pipeline_root,
         model_display_name="creature-vision-model",
         # Directly passing the string output
         previous_model_version=get_previous_model_task.output,
         model_version=model_version,
-        args=[]
-    ).after(dataflow_task)
+        service_account=service_account
+    ).after(wait_task)
 
 
 # Compile the pipeline
@@ -132,10 +199,11 @@ GCS_TEMPLATE_PATH = "gs://dataflow-use1/templates/creature-vision-template.json"
 # Artifact Registry URIs
 ARTIFACT_REGISTRY = f"{REGION}-docker.pkg.dev/{PROJECT_ID}"
 INFERENCE_IMAGE = f"{ARTIFACT_REGISTRY}/dog-prediction-app/inference:latest"
-TRAINING_IMAGE = f"{ARTIFACT_REGISTRY}/creature-vis-training/training:latest"
 
-# Model Storage in GCS
+
+# GCS Artifacts
 MODEL_BUCKET = "tf_models_cv"
+PYTHON_PACKAGE_URI = "gs://creture-vision-ml-artifacts/src/training"
 
 # Initialize Vertex AI
 aiplatform.init(
@@ -151,7 +219,7 @@ parameter_values = {
     "pipeline_root": PIPELINE_ROOT,
     "model_bucket": MODEL_BUCKET,
     "inference_image": INFERENCE_IMAGE,
-    "training_image": TRAINING_IMAGE,
+    "python_package_gcs_uri": PYTHON_PACKAGE_URI,
     "service_account": SERVICE_ACCOUNT,
     "gcs_template_path": GCS_TEMPLATE_PATH
 }
