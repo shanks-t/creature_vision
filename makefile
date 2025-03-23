@@ -152,3 +152,16 @@ cp-train-pkg:
 
 check-pkg:
 	gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -tzf -
+
+test-run-inf:
+	curl -X GET https://dog-predictor-284159624099.us-east1.run.app/predict/
+
+test-pipelin-cf:
+	curl -X POST https://us-east1-creature-vision.cloudfunctions.net/trigger-creature-pipeline
+
+deploy-pipelin-cf:
+	cd src/trigger && \
+	gcloud functions deploy trigger-creature-pipeline \
+	--runtime=python310 --entry-point=trigger_pipeline \
+	--trigger-http --region=us-east1 --memory=512MB \
+	--source=. --allow-unauthenticated
