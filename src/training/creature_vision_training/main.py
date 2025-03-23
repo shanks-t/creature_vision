@@ -15,12 +15,11 @@ sys.path.append("/gcs/creture-vision-ml-artifacts/src/training")
 def parse_args():
     """Parse command-line arguments for training."""
 
-    model_version = "v-20250323"
     print(f"Raw sys.argv received: {sys.argv}")
     parser = argparse.ArgumentParser(
         description="Train a machine learning model and save it to GCS.")
-    parser.add_argument("--version", type=str, default=model_version,
-                        required=False, help="Version identifier for the model")
+    parser.add_argument("--version", type=str, required=True,
+                        help="Version identifier for the model")
     parser.add_argument("--previous_model_version", type=str, default=None,
                         required=False, help="Previous model version for stateful training")
     return parser.parse_args()
@@ -37,7 +36,7 @@ def main():
     STAGING_BUCKET = os.getenv("STAGING_BUCKET", "creture-vision-ml-artifacts")
     AIP_TENSORBOARD_LOG_DIR = os.getenv(
         "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local")
-    model_gcs_path = args.previous_model_version
+    model_gcs_path = f"gs://tf_models_cv/{args.previous_model_version}"
     NEW_VERSION = args.version
 
     print(f"Starting training with version: {args.version}")
