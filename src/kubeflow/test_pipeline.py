@@ -7,6 +7,7 @@ from kfp import compiler
 
 from google.cloud import aiplatform
 from google_cloud_pipeline_components.v1.dataflow import DataflowFlexTemplateJobOp
+from google_cloud_pipeline_components.v1.custom_job import CustomTrainingJobOp
 
 
 # Simplified get_previous_model component that returns a string
@@ -80,50 +81,6 @@ def wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_inte
         f"Dataflow job {job_id} did not complete within the allotted time of {timeout} seconds.")
 
 
-@dsl.component(base_image="python:3.10", packages_to_install=["google-cloud-aiplatform"])
-def run_custom_python_package_training_job(
-    project: str,
-    location: str,
-    display_name: str,
-    python_package_gcs_uri: str,  # GCS path to training package
-    python_module: str,
-    staging_bucket: str,
-    model_display_name: str,
-    previous_model_version: str,
-    model_version: str,
-    service_account: str
-):
-    import os
-    from google.cloud import aiplatform
-
-    # Disable GPU
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-    # Define arguments for training script
-    args = [
-        "--version", model_version,
-        "--previous_model_version", previous_model_version
-    ]
-
-    aiplatform.init(project=project, location=location,
-                    staging_bucket=staging_bucket)
-
-    job = aiplatform.CustomPythonPackageTrainingJob(
-        display_name=display_name,
-        python_package_gcs_uri=python_package_gcs_uri,
-        python_module_name=python_module,
-        model_serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-3:latest"
-    )
-
-    job.run(
-        args=args,
-        service_account=service_account,
-        replica_count=1,
-        machine_type="e2-highmem-4",
-        model_display_name=model_display_name,
-    )
-
-
 # Pipeline definition
 @dsl.pipeline(
     name="creature-vision-pipeline",
@@ -167,18 +124,27 @@ def creature_vision_pipeline(
         job_name=df_job_name
     )
 
-    # Define the Custom Container Training task
-    training_task = run_custom_python_package_training_job(
+    training_task = CustomTrainingJobOp(
+        display_name="creature-vision-training",
         project=project_id,
         location=region,
-        display_name="creature-vision-training",
-        python_package_gcs_uri=python_package_gcs_uri,
-        python_module="main",
-        staging_bucket=pipeline_root,
-        model_display_name="creature-vision-model",
-        # Directly passing the string output
-        previous_model_version=get_previous_model_task.output,
-        model_version=model_version,
+        worker_pool_specs=[
+            {
+                "machine_spec": {
+                    "machine_type": "e2-standard-4",
+                },
+                "replica_count": 1,
+                "python_package_spec": {
+                    "executor_image_uri": "us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-16.py310:latest",
+                    "package_uris": [python_package_gcs_uri],
+                    "python_module": "creature_vision_training.main",
+                    "args": [
+                        "--version", model_version,
+                        "--previous_model_version", get_previous_model_task.output
+                    ],
+                },
+            }
+        ],
         service_account=service_account
     ).after(wait_task)
 
@@ -203,7 +169,7 @@ INFERENCE_IMAGE = f"{ARTIFACT_REGISTRY}/dog-prediction-app/inference:latest"
 
 # GCS Artifacts
 MODEL_BUCKET = "tf_models_cv"
-PYTHON_PACKAGE_URI = "gs://creture-vision-ml-artifacts/src/training"
+PYTHON_PACKAGE_URI = "gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz"
 
 # Initialize Vertex AI
 aiplatform.init(
