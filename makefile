@@ -134,17 +134,21 @@ test-inference:
 	curl -X GET\
 	  https://dog-predictor-284159624099.us-east1.run.app/predict \
 	  
-test-train:
-	@echo "Submiting custome training job to test new training code"
+test-train: cp-train-pkg
+	@echo "Submitting custom training job to test new training code"
 	gcloud ai custom-jobs create \
-  --region=us-east1 \
-  --display-name=creature-vision-training \
-  --python-package-uris=gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz \
-  --args=--version=v-20250322,--previous_model_version=v-20250321 \
-  --worker-pool-spec=machine-type=e2-standard-4,replica-count=1,executor-image-uri=us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-17.py310:latest,python-module=creature_vision_training.main \
-  --service-account=kubeflow-pipeline-sa@creature-vision.iam.gserviceaccount.com
+	  --region=us-east1 \
+	  --display-name=creture-vision-training \
+	  --python-package-uris=gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz \
+	  --args=--version=v-20250323 \
+	  --worker-pool-spec=machine-type=e2-standard-4,replica-count=1,executor-image-uri=us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-17.py310:latest,python-module=creature_vision_training.main \
+	  --service-account=kubeflow-pipeline-sa@creature-vision.iam.gserviceaccount.com
 
 cp-train-pkg:
 	cd src/training && \
+	rm -rf dist && \
 	python setup.py sdist && \
 	gsutil cp dist/*.tar.gz gs://creture-vision-ml-artifacts/python_packages/
+
+check-pkg:
+	gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -tzf -
