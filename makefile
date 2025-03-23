@@ -29,7 +29,7 @@ endif
 
 # Image Tag
 IMAGE_TAG := ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${APP_NAME}/${SERVICE}:${VERSION}
-
+TAR_FILE=${SERVICE}.tar  # Define the tar file for saving the image
 # Dataflow parameters
 MAXFILES ?= 500
 RANDOM_SEED ?= 42
@@ -70,14 +70,31 @@ run-local:
 	docker-compose -f docker/$(SERVICE)/docker-compose.local.yaml up && \
 	docker compose -f docker/$(SERVICE)/docker-compose.local.yaml rm -fsv
 
-build-push: auth-registry
-	docker buildx build --no-cache -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
-		--platform linux/amd64 \
-		-t ${IMAGE_TAG} \
-		--push
-
+# Authenticate to Artifact Registry
 auth-registry:
 	gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+# Build image without pushing (disable BuildKit to avoid timeout issues)
+build:
+	DOCKER_BUILDKIT=0 docker build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
+		--platform linux/amd64 \
+		-t ${IMAGE_TAG}
+
+# Save the built image as a .tar file
+save:
+	docker save -o ${TAR_FILE} ${IMAGE_TAG}
+
+# Load the image from the .tar file and push it
+load-push: auth-registry
+	docker load -i ${TAR_FILE}
+	docker push ${IMAGE_TAG}
+
+# Clean up the local .tar file
+clean:
+	rm -f ${TAR_FILE}
+
+# Run all steps in one command
+build-push: build save load-push clean
 
 push-image: auth-registry
 	docker tag ${APP_NAME}:${VERSION} ${IMAGE_TAG}
@@ -110,3 +127,41 @@ test-template: ## Test the Integrity of the Flex Container
 	@echo "Checking if Package Installed on Container" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'python -c "import beam_flex" && echo ✓'
 	@echo "Checking if UDFs Installed on Container" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'python -c "from beam_flex.modules.pipeline import GCSImagePathProvider" && echo ✓'
 	@echo "Running Pipeline Locally..." && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c "python ${FLEX_TEMPLATE_PYTHON_PY_FILE} --runner DirectRunner --output output.txt && cat output.txt*"
+
+# Cloud Run Inference Test
+test-inference:
+	@echo "Sending test prediction request to Cloud Run inference service..."
+	curl -X GET\
+	  https://dog-predictor-284159624099.us-east1.run.app/predict \
+	  
+test-train: cp-train-pkg
+	@echo "Submitting custom training job to test new training code"
+	gcloud ai custom-jobs create \
+	  --region=us-east1 \
+	  --display-name=creture-vision-training \
+	  --python-package-uris=gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz \
+	  --args=--version=v-20250323 \
+	  --worker-pool-spec=machine-type=e2-standard-4,replica-count=1,executor-image-uri=us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-17.py310:latest,python-module=creature_vision_training.main \
+	  --service-account=kubeflow-pipeline-sa@creature-vision.iam.gserviceaccount.com
+
+cp-train-pkg:
+	cd src/training && \
+	rm -rf dist && \
+	python setup.py sdist && \
+	gsutil cp dist/*.tar.gz gs://creture-vision-ml-artifacts/python_packages/
+
+check-pkg:
+	gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -tzf -
+
+test-run-inf:
+	curl -X GET https://dog-predictor-284159624099.us-east1.run.app/predict/
+
+test-pipelin-cf:
+	curl -X POST https://us-east1-creature-vision.cloudfunctions.net/trigger-creature-pipeline
+
+deploy-pipelin-cf:
+	cd src/trigger && \
+	gcloud functions deploy trigger-creature-pipeline \
+	--runtime=python310 --entry-point=trigger_pipeline \
+	--trigger-http --region=us-east1 --memory=512MB \
+	--source=. --allow-unauthenticated

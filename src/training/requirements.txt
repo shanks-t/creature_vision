@@ -1,7 +1,4 @@
-tensorflow
-tensorboard
 pillow
 google-cloud-storage
 google-cloud-bigquery
-numpy
-google-cloud-aiplatform[tensorboard]
+

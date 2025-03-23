@@ -4,6 +4,7 @@ import time
 import json
 import structlog
 from datetime import datetime
+import os
 
 import tensorflow as tf
 import numpy as np
@@ -14,7 +15,7 @@ from flask import Flask, jsonify
 from google.cloud import bigquery
 
 
-from .load_model import load_model
+from load_model import load_model
 
 # Configure structured logging
 structlog.configure(
@@ -43,25 +44,12 @@ storage_client = storage.Client(project="creature-vision")
 DATA_BUCKET_NAME = "creature-vision-training-set"
 data_bucket = storage_client.bucket(DATA_BUCKET_NAME)
 
-# Command-line argument parsing
-
-
-def parse_args():
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Inference service for dog breed prediction")
-    parser.add_argument("--model_version", type=str, required=True,
-                        help="Version of the model to use for inference")
-    return parser.parse_args()
 
 # Load model and metadata
-
-
 def initialize_model(model_version):
     """Load the trained model from GCS based on the provided version."""
     try:
-        model_gcs_path = f"gs://tf_models_cv/{model_version}/{model_version}.keras"
-        model, metadata = load_model(model_gcs_path)
+        model, metadata = load_model(model_version)
         logger.info("Model loaded successfully", version=model_version)
         return model, metadata
     except Exception as e:
@@ -221,9 +209,10 @@ def health_check():
 
 
 if __name__ == "__main__":
-    # Parse command-line arguments
-    args = parse_args()
-    model_version = args.model_version
+    # use env vars
+    model_version = os.environ.get("MODEL_VERSION")
+    if not model_version:
+        raise ValueError("MODEL_VERSION environment variable not set")
 
     # Load model
     model, metadata = initialize_model(model_version)

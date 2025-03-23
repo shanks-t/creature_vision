@@ -5,17 +5,21 @@ import sys
 
 from google.cloud import aiplatform
 
-from model import setup_model, run_training, load_or_create_model, save_model, compute_class_weight
-from dataset import create_training_dataset
+from creature_vision_training.model import setup_model, run_training, load_or_create_model, save_model, compute_class_weight
+from creature_vision_training.dataset import create_training_dataset
+
+# Add GCS module path
+sys.path.append("/gcs/creture-vision-ml-artifacts/src/training")
 
 
 def parse_args():
     """Parse command-line arguments for training."""
+
     print(f"Raw sys.argv received: {sys.argv}")
     parser = argparse.ArgumentParser(
         description="Train a machine learning model and save it to GCS.")
-    parser.add_argument("--version", type=str,
-                        required=True, help="Version identifier for the model")
+    parser.add_argument("--version", type=str, required=True,
+                        help="Version identifier for the model")
     parser.add_argument("--previous_model_version", type=str, default=None,
                         required=False, help="Previous model version for stateful training")
     return parser.parse_args()
@@ -32,7 +36,7 @@ def main():
     STAGING_BUCKET = os.getenv("STAGING_BUCKET", "creture-vision-ml-artifacts")
     AIP_TENSORBOARD_LOG_DIR = os.getenv(
         "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local")
-    model_gcs_path = args.previous_model_version
+    model_gcs_path = f"gs://tf_models_cv/{args.previous_model_version}"
     NEW_VERSION = args.version
 
     print(f"Starting training with version: {args.version}")
@@ -46,7 +50,7 @@ def main():
     }
 
     # Dataset preparation
-    train_ds, val_ds, num_classes, class_names = create_training_dataset(
+    train_ds, val_ds, num_classes, class_names, label_map = create_training_dataset(
         bucket_name=BUCKET_NAME,
         tfrecord_path=f"processed/{NEW_VERSION}",
         labels_path="processed/metadata",
@@ -70,7 +74,7 @@ def main():
         model, metrics, callbacks = setup_model(model)
 
         # Class weighting
-        class_weights = compute_class_weight(train_ds)
+        class_weights = compute_class_weight(train_ds, label_map)
 
         # Run training phase
         trained_model = run_training(

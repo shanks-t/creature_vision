@@ -18,11 +18,13 @@ def setup_model(
         tf.keras.metrics.SparseCategoricalCrossentropy(
             name='cross_entropy')
     ]
+    log_dir = os.getenv('AIP_TENSORBOARD_LOG_DIR',
+                        'gs://creture-vision-ml-artifacts/local')
 
     # Create callbacks
     callbacks = [
         tf.keras.callbacks.TensorBoard(
-            log_dir=os.environ['AIP_TENSORBOARD_LOG_DIR'],
+            log_dir=log_dir,
             histogram_freq=1,
             profile_batch=(50, 100),
             update_freq='epoch'
@@ -77,9 +79,6 @@ def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.ker
     # Add preprocessing layer
     x = tf.keras.applications.mobilenet_v3.preprocess_input(inputs)
 
-    # Add data augmentation layer (only active during training)
-    x = create_augmentation_layer()(x)
-
     # Create base model
     base_model = tf.keras.applications.MobileNetV3Small(
         input_shape=input_shape,
@@ -112,35 +111,6 @@ def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.ker
     )(x)
 
     return tf.keras.Model(inputs, outputs)
-
-
-def compute_class_weight(dataset: tf.data.Dataset) -> dict:
-    """
-    Compute class weights from a TensorFlow dataset
-
-    Args:
-        dataset: TensorFlow dataset containing (image, label) pairs
-    Returns:
-        Dictionary mapping class indices to weights
-    """
-    # Extract all labels from dataset
-    labels = []
-    for _, batch_labels in dataset:
-        labels.extend(batch_labels.numpy())
-
-    # Count class frequencies
-    counter = Counter(labels)
-    total_samples = sum(counter.values())
-    n_classes = len(counter)
-
-    # Compute weights inversely proportional to class frequencies
-    weights = {
-        class_id: total_samples / (n_classes * count)
-        for class_id, count in counter.items()
-    }
-
-    # print("Computed class weights:", weights)
-    return weights
 
 
 def load_or_create_model(num_classes: int, model_gcs_path: str = None) -> tf.keras.Model:
@@ -182,51 +152,44 @@ def load_or_create_model(num_classes: int, model_gcs_path: str = None) -> tf.ker
     return model
 
 
-def create_augmentation_layer():
-    """Creates a sequential augmentation layer optimized for image classification"""
-    return tf.keras.Sequential([
-        # Geometric transformations
-        tf.keras.layers.RandomFlip("horizontal"),
-        tf.keras.layers.RandomRotation(0.2),
-        tf.keras.layers.RandomTranslation(0.1, 0.1),
-        tf.keras.layers.RandomZoom(
-            height_factor=(-0.05, -0.15),
-            width_factor=(-0.05, -0.15)
-        ),
-
-        # Photometric transformations
-        tf.keras.layers.RandomBrightness(0.2),
-        tf.keras.layers.RandomContrast(0.2),
-
-    ])
-
-
-def compute_class_weight(dataset: tf.data.Dataset) -> dict:
+def compute_class_weight(dataset, label_map):
     """
-    Compute class weights from a TensorFlow dataset
+    Compute class weights ensuring all class keys are accounted for.
 
     Args:
-        dataset: TensorFlow dataset containing (image, label) pairs
+        dataset: TensorFlow dataset containing (image, label) pairs.
+        label_map: Dictionary mapping class names to integer labels.
+
     Returns:
-        Dictionary mapping class indices to weights
+        Dictionary mapping class indices to weights.
     """
+    # Extract class indices from label_map
+    all_classes = set(label_map.values())  # Set of all possible classes
+
     # Extract all labels from dataset
     labels = []
     for _, batch_labels in dataset:
         labels.extend(batch_labels.numpy())
 
-    # Count class frequencies
+    # Convert all labels to integers (to match label_map values)
+    labels = [int(label) for label in labels]
+
+    # Count occurrences of each label in the dataset
     counter = Counter(labels)
     total_samples = sum(counter.values())
-    n_classes = len(counter)
 
-    # Compute weights inversely proportional to class frequencies
+    # Compute weights inversely proportional to class frequency
     weights = {
-        class_id: total_samples / (n_classes * count)
-        for class_id, count in counter.items()
+        class_id: total_samples /
+        (len(all_classes) * counter.get(class_id, 1))  # Default 1 if missing
+        for class_id in all_classes
     }
 
-    # print("Computed class weights:", weights)
+    # Normalize weights to prevent extreme values
+    max_weight = max(weights.values())
+    weights = {k: v / max_weight for k, v in weights.items()}  # Normalize
+    print(f"class weights {weights}")
+
     return weights
 
 

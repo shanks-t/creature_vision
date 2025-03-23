@@ -1,0 +1,31 @@
+[changelog]
+header = "# Changelog"
+body = """
+{% for date, commits in commits | group_by(attribute="timestamp", date_format="%Y-%m-%d") %}
+## {{ date }}
+
+{% for group, grouped in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in grouped %}
+- {{ commit.message | upper_first }} [{{ commit.id | truncate(length=7) }}]
+{% endfor %}
+{% endfor %}
+{% endfor %}
+"""
+trim = true
+sort_commits = "oldest"
+tag_pattern = ".*"  # default behavior, still needed
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+include_commit_timestamp = true
+
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Fixes" },
+  { message = "^docs", group = "Docs" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^test", group = "Tests" },
+  { message = ".*", group = "Other" }
+]

@@ -1,0 +1,38 @@
+# name: Append Changelog
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+# jobs:
+#   changelog:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
+
+#       - name: Install git-cliff
+#         run: |
+#           curl -sSL https://github.com/orhun/git-cliff/releases/latest/download/git-cliff-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+#           sudo mv git-cliff /usr/local/bin/
+
+#       - name: Append changelog (latest commits only)
+#         run: |
+#           # Save output to a temp file
+#           git-cliff -c cliff.toml --since '1 day ago' > NEW_CHANGELOG.md
+
+#           # Only append if there are new entries
+#           if [ -s NEW_CHANGELOG.md ]; then
+#             echo "" >> CHANGELOG.md
+#             cat NEW_CHANGELOG.md >> CHANGELOG.md
+#           fi
+
+#       - name: Commit and push changes
+#         run: |
+#           git config user.name "github-actions"
+#           git config user.email "github-actions@github.com"
+#           git add CHANGELOG.md
+#           git diff --cached --quiet || git commit -m "chore(docs): append changelog [skip ci]"
+#           git push
