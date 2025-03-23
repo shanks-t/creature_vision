@@ -24,7 +24,7 @@ def deploy_cloud_run_inference_service(
             "--project", project_id,
             "--allow-unauthenticated",
             "--set-env-vars", f"MODEL_VERSION={model_version}",
-            "--memory", "512Mi",
+            "--memory", "2Gi",
             "--timeout", "300",
         ]
     )
@@ -52,15 +52,14 @@ def test_cloudrun_pipeline(
         model_version=model_version
     )
 
+
 # ---- Config & Compile ----
-
-
 PROJECT_ID = "creature-vision"
 REGION = "us-east1"
 PIPELINE_ROOT = f"gs://creature-vision-pipeline-artifacts"
 SERVICE_NAME = "dog-predictor"
 INFERENCE_IMAGE = f"{REGION}-docker.pkg.dev/{PROJECT_ID}/dog-prediction-app/inference:latest"
-MODEL_VERSION = "v-20250315"
+MODEL_VERSION = "mar-06-2025"
 
 # Compile the pipeline
 compiler.Compiler().compile(
