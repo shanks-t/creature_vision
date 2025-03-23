@@ -127,3 +127,24 @@ test-template: ## Test the Integrity of the Flex Container
 	@echo "Checking if Package Installed on Container" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'python -c "import beam_flex" && echo ✓'
 	@echo "Checking if UDFs Installed on Container" && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c 'python -c "from beam_flex.modules.pipeline import GCSImagePathProvider" && echo ✓'
 	@echo "Running Pipeline Locally..." && docker run --platform linux/amd64 --rm --entrypoint /bin/bash ${TEMPLATE_IMAGE} -c "python ${FLEX_TEMPLATE_PYTHON_PY_FILE} --runner DirectRunner --output output.txt && cat output.txt*"
+
+# Cloud Run Inference Test
+test-inference:
+	@echo "Sending test prediction request to Cloud Run inference service..."
+	curl -X GET\
+	  https://dog-predictor-284159624099.us-east1.run.app/predict \
+	  
+test-train:
+	@echo "Submiting custome training job to test new training code"
+	gcloud ai custom-jobs create \
+  --region=us-east1 \
+  --display-name=creature-vision-training \
+  --python-package-uris=gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz \
+  --args=--version=v-20250322,--previous_model_version=v-20250321 \
+  --worker-pool-spec=machine-type=e2-standard-4,replica-count=1,executor-image-uri=us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-17.py310:latest,python-module=creature_vision_training.main \
+  --service-account=kubeflow-pipeline-sa@creature-vision.iam.gserviceaccount.com
+
+cp-train-pkg:
+	cd src/training && \
+	python setup.py sdist && \
+	gsutil cp dist/*.tar.gz gs://creture-vision-ml-artifacts/python_packages/

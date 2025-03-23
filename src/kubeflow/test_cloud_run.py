@@ -59,7 +59,7 @@ REGION = "us-east1"
 PIPELINE_ROOT = f"gs://creature-vision-pipeline-artifacts"
 SERVICE_NAME = "dog-predictor"
 INFERENCE_IMAGE = f"{REGION}-docker.pkg.dev/{PROJECT_ID}/dog-prediction-app/inference:latest"
-MODEL_VERSION = "mar-06-2025"
+MODEL_VERSION = "mar-09-2025"
 
 # Compile the pipeline
 compiler.Compiler().compile(
