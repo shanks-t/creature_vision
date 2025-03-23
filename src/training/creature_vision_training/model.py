@@ -79,9 +79,6 @@ def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.ker
     # Add preprocessing layer
     x = tf.keras.applications.mobilenet_v3.preprocess_input(inputs)
 
-    # Add data augmentation layer (only active during training)
-    x = create_augmentation_layer()(x)
-
     # Create base model
     base_model = tf.keras.applications.MobileNetV3Small(
         input_shape=input_shape,
@@ -153,25 +150,6 @@ def load_or_create_model(num_classes: int, model_gcs_path: str = None) -> tf.ker
         model = create_model(num_classes)
 
     return model
-
-
-def create_augmentation_layer():
-    """Creates a sequential augmentation layer optimized for image classification"""
-    return tf.keras.Sequential([
-        # Geometric transformations
-        tf.keras.layers.RandomFlip("horizontal"),
-        tf.keras.layers.RandomRotation(0.2),
-        tf.keras.layers.RandomTranslation(0.1, 0.1),
-        tf.keras.layers.RandomZoom(
-            height_factor=(-0.05, -0.15),
-            width_factor=(-0.05, -0.15)
-        ),
-
-        # Photometric transformations
-        tf.keras.layers.RandomBrightness(0.2),
-        tf.keras.layers.RandomContrast(0.2),
-
-    ])
 
 
 def compute_class_weight(dataset, label_map):

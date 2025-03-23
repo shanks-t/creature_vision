@@ -5,8 +5,8 @@ import sys
 
 from google.cloud import aiplatform
 
-from model import setup_model, run_training, load_or_create_model, save_model, compute_class_weight
-from dataset import create_training_dataset
+from creature_vision_training.model import setup_model, run_training, load_or_create_model, save_model, compute_class_weight
+from creature_vision_training.dataset import create_training_dataset
 
 # Add GCS module path
 sys.path.append("/gcs/creture-vision-ml-artifacts/src/training")
@@ -15,7 +15,7 @@ sys.path.append("/gcs/creture-vision-ml-artifacts/src/training")
 def parse_args():
     """Parse command-line arguments for training."""
 
-    model_version = "v-20250315"
+    model_version = "v-20250323"
     print(f"Raw sys.argv received: {sys.argv}")
     parser = argparse.ArgumentParser(
         description="Train a machine learning model and save it to GCS.")

@@ -24,6 +24,26 @@ def parse_tfrecord_fn(example_proto):
     return image, features['label']
 
 
+def get_augmentation_fn():
+    """Returns a function that applies data augmentation."""
+    augment = tf.keras.Sequential([
+        tf.keras.layers.RandomFlip("horizontal"),
+        tf.keras.layers.RandomRotation(0.2),
+        tf.keras.layers.RandomTranslation(0.1, 0.1),
+        tf.keras.layers.RandomZoom(
+            height_factor=(-0.05, -0.15), width_factor=(-0.05, -0.15)),
+        tf.keras.layers.RandomBrightness(0.2),
+        tf.keras.layers.RandomContrast(0.2),
+    ])
+
+    def augment_fn(image, label):
+        # Ensures augmentation is applied
+        image = augment(image, training=True)
+        return image, label
+
+    return augment_fn
+
+
 def create_training_dataset(
     bucket_name: str,
     tfrecord_path: str,
@@ -80,8 +100,12 @@ def create_training_dataset(
     num_classes = len(class_names)
     print(f"Found {num_classes} classes: {class_names}")
 
+    # Apply augmentation to train dataset only
+    augment_fn = get_augmentation_fn()
+    train_ds = train_ds.map(augment_fn, num_parallel_calls=tf.data.AUTOTUNE)
+
     # Optimize datasets for training
-    train_ds = train_ds.shuffle(1000).batch(
+    train_ds = train_ds.shuffle(dataset.cardinality()).batch(
         batch_size).prefetch(tf.data.AUTOTUNE)
     val_ds = val_ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
 
