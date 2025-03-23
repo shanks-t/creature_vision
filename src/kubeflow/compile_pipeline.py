@@ -35,6 +35,7 @@ def wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_inte
     or the `timeout` is reached.
     """
     from googleapiclient.discovery import build
+    import time
 
     dataflow = build('dataflow', 'v1b3')
     elapsed_time = 0
@@ -81,6 +82,30 @@ def wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_inte
         f"Dataflow job {job_id} did not complete within the allotted time of {timeout} seconds.")
 
 
+@dsl.container_component
+def deploy_cloud_run_inference_service(
+    project_id: str,
+    region: str,
+    service_name: str,
+    image_uri: str,
+    model_version: str,
+):
+    return dsl.ContainerSpec(
+        image="gcr.io/google.com/cloudsdktool/cloud-sdk:slim",
+        command=["gcloud", "run", "deploy", service_name],
+        args=[
+            "--image", image_uri,
+            "--region", region,
+            "--platform", "managed",
+            "--project", project_id,
+            "--allow-unauthenticated",
+            "--set-env-vars", f"MODEL_VERSION={model_version}",
+            "--memory", "2Gi",
+            "--timeout", "300",
+        ]
+    )
+
+
 # Pipeline definition
 @dsl.pipeline(
     name="creature-vision-pipeline",
@@ -92,6 +117,7 @@ def creature_vision_pipeline(
     pipeline_root: str,
     model_bucket: str,
     inference_image: str,
+    inference_service: str,
     python_package_gcs_uri: str,
     service_account: str,
     gcs_template_path: str
@@ -122,12 +148,13 @@ def creature_vision_pipeline(
         project_id=project_id,
         region=region,
         job_name=df_job_name
-    )
-
+    ).after(dataflow_task)
+    # available images https://cloud.google.com/vertex-ai/docs/training/pre-built-containers
     training_task = CustomTrainingJobOp(
         display_name="creature-vision-training",
         project=project_id,
         location=region,
+        tensorboard="projects/284159624099/locations/us-east1/tensorboards/3018185806524186624",
         worker_pool_specs=[
             {
                 "machine_spec": {
@@ -135,7 +162,7 @@ def creature_vision_pipeline(
                 },
                 "replica_count": 1,
                 "python_package_spec": {
-                    "executor_image_uri": "us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-16.py310:latest",
+                    "executor_image_uri": "us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-17.py310:latest",
                     "package_uris": [python_package_gcs_uri],
                     "python_module": "creature_vision_training.main",
                     "args": [
@@ -147,6 +174,14 @@ def creature_vision_pipeline(
         ],
         service_account=service_account
     ).after(wait_task)
+
+    deploy_task = deploy_cloud_run_inference_service(
+        project_id=project_id,
+        region=region,
+        service_name=inference_service,
+        image_uri=inference_image,
+        model_version=model_version
+    ).after(training_task)
 
 
 # Compile the pipeline
@@ -161,6 +196,7 @@ REGION = "us-east1"
 PIPELINE_ROOT = f"gs://creature-vision-pipeline-artifacts"
 SERVICE_ACCOUNT = f"kubeflow-pipeline-sa@{PROJECT_ID}.iam.gserviceaccount.com"
 GCS_TEMPLATE_PATH = "gs://dataflow-use1/templates/creature-vision-template.json"
+INFERENCE_SERVICE_NAME = "dog-predictor"
 
 # Artifact Registry URIs
 ARTIFACT_REGISTRY = f"{REGION}-docker.pkg.dev/{PROJECT_ID}"
@@ -185,18 +221,19 @@ parameter_values = {
     "pipeline_root": PIPELINE_ROOT,
     "model_bucket": MODEL_BUCKET,
     "inference_image": INFERENCE_IMAGE,
+    "inference_service": INFERENCE_SERVICE_NAME,
     "python_package_gcs_uri": PYTHON_PACKAGE_URI,
     "service_account": SERVICE_ACCOUNT,
     "gcs_template_path": GCS_TEMPLATE_PATH
 }
 
 # Create and run the pipeline job
-pipeline_job = aiplatform.PipelineJob(
-    display_name="creature-vision-pipeline-job",
-    template_path="creature_vision_pipeline.json",
-    pipeline_root=PIPELINE_ROOT,
-    parameter_values=parameter_values,
-    enable_caching=True,
-)
+# pipeline_job = aiplatform.PipelineJob(
+#     display_name="creature-vision-pipeline-job",
+#     template_path="creature_vision_pipeline.json",
+#     pipeline_root=PIPELINE_ROOT,
+#     parameter_values=parameter_values,
+#     enable_caching=True,
+# )
 
-pipeline_job.run(service_account=SERVICE_ACCOUNT)
+# pipeline_job.run(service_account=SERVICE_ACCOUNT)
