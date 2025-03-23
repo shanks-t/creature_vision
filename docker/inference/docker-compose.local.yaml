@@ -1,8 +1,8 @@
 services:
   dog-prediction-app:
     build:
-      context: ../../
-      dockerfile: docker/inference/Dockerfile
+      context: ../../src/inference
+      dockerfile: ../../docker/inference/Dockerfile
       args:
         - BUILDPLATFORM=linux/arm64
         - TARGETARCH=arm64
