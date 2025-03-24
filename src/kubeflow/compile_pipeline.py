@@ -122,9 +122,11 @@ def creature_vision_pipeline(
     service_account: str,
     gcs_template_path: str
 ):
-    """Kubeflow Pipeline that runs a Dataflow Flex Template job after retrieving the previous model."""
+
     date_str = datetime.datetime.now().strftime("%Y%m%d")
     model_version = f"v-{date_str}"
+
+    job_date_str = datetime.datetime.now().strftime("%Y%m%d-%H%M")
 
     # Task to get the previous model version
     get_previous_model_task = get_previous_model(bucket_name=model_bucket)
@@ -137,7 +139,7 @@ def creature_vision_pipeline(
         job_name=df_job_name,
         parameters={
             "version": model_version,
-            "max_files": "1000"
+            "max_files": "100"
         },
         service_account_email=service_account,
         launch_options={"enable_preflight_validation": "false"},
@@ -149,6 +151,7 @@ def creature_vision_pipeline(
         region=region,
         job_name=df_job_name
     ).after(dataflow_task)
+
     # available images https://cloud.google.com/vertex-ai/docs/training/pre-built-containers
     training_task = CustomTrainingJobOp(
         display_name="creature-vision-training",
@@ -191,41 +194,41 @@ compiler.Compiler().compile(
 )
 
 # Project Configuration
-PROJECT_ID = "creature-vision"
-REGION = "us-east1"
-PIPELINE_ROOT = f"gs://creature-vision-pipeline-artifacts"
-SERVICE_ACCOUNT = f"kubeflow-pipeline-sa@{PROJECT_ID}.iam.gserviceaccount.com"
-GCS_TEMPLATE_PATH = "gs://dataflow-use1/templates/creature-vision-template.json"
-INFERENCE_SERVICE_NAME = "dog-predictor"
+# PROJECT_ID = "creature-vision"
+# REGION = "us-east1"
+# PIPELINE_ROOT = f"gs://creature-vision-pipeline-artifacts"
+# SERVICE_ACCOUNT = f"kubeflow-pipeline-sa@{PROJECT_ID}.iam.gserviceaccount.com"
+# GCS_TEMPLATE_PATH = "gs://dataflow-use1/templates/creature-vision-template.json"
+# INFERENCE_SERVICE_NAME = "dog-predictor"
 
-# Artifact Registry URIs
-ARTIFACT_REGISTRY = f"{REGION}-docker.pkg.dev/{PROJECT_ID}"
-INFERENCE_IMAGE = f"{ARTIFACT_REGISTRY}/dog-prediction-app/inference:latest"
+# # Artifact Registry URIs
+# ARTIFACT_REGISTRY = f"{REGION}-docker.pkg.dev/{PROJECT_ID}"
+# INFERENCE_IMAGE = f"{ARTIFACT_REGISTRY}/dog-prediction-app/inference:latest"
 
 
-# GCS Artifacts
-MODEL_BUCKET = "tf_models_cv"
-PYTHON_PACKAGE_URI = "gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz"
+# # GCS Artifacts
+# MODEL_BUCKET = "tf_models_cv"
+# PYTHON_PACKAGE_URI = "gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz"
 
 # Initialize Vertex AI
-aiplatform.init(
-    project=PROJECT_ID,
-    location=REGION,
-    staging_bucket=PIPELINE_ROOT
-)
+# aiplatform.init(
+#     project=PROJECT_ID,
+#     location=REGION,
+#     staging_bucket=PIPELINE_ROOT
+# )
 
 # Define pipeline parameters
-parameter_values = {
-    "project_id": PROJECT_ID,
-    "region": REGION,
-    "pipeline_root": PIPELINE_ROOT,
-    "model_bucket": MODEL_BUCKET,
-    "inference_image": INFERENCE_IMAGE,
-    "inference_service": INFERENCE_SERVICE_NAME,
-    "python_package_gcs_uri": PYTHON_PACKAGE_URI,
-    "service_account": SERVICE_ACCOUNT,
-    "gcs_template_path": GCS_TEMPLATE_PATH
-}
+# parameter_values = {
+#     "project_id": PROJECT_ID,
+#     "region": REGION,
+#     "pipeline_root": PIPELINE_ROOT,
+#     "model_bucket": MODEL_BUCKET,
+#     "inference_image": INFERENCE_IMAGE,
+#     "inference_service": INFERENCE_SERVICE_NAME,
+#     "python_package_gcs_uri": PYTHON_PACKAGE_URI,
+#     "service_account": SERVICE_ACCOUNT,
+#     "gcs_template_path": GCS_TEMPLATE_PATH
+# }
 
 # Create and run the pipeline job
 # pipeline_job = aiplatform.PipelineJob(
