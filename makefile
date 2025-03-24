@@ -58,7 +58,7 @@ get-deps:
 	pip install pipreqs
 	pipreqs ./src/$(SERVICE) --savepath ./src/$(SERVICE)/requirements.txt --use-local --force
 
-build:
+build-image:
 	docker buildx build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
 		--platform linux/amd64 \
 		-t ${IMAGE_TAG} \
@@ -74,11 +74,6 @@ run-local:
 auth-registry:
 	gcloud auth configure-docker ${REGION}-docker.pkg.dev
 
-# Build image without pushing (disable BuildKit to avoid timeout issues)
-build:
-	DOCKER_BUILDKIT=0 docker build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
-		--platform linux/amd64 \
-		-t ${IMAGE_TAG}
 
 # Save the built image as a .tar file
 save:
@@ -156,12 +151,15 @@ check-pkg:
 test-run-inf:
 	curl -X GET https://dog-predictor-284159624099.us-east1.run.app/predict/
 
-test-pipelin-cf:
+test-pipeline-cf:
 	curl -X POST https://us-east1-creature-vision.cloudfunctions.net/trigger-creature-pipeline
 
-deploy-pipelin-cf:
+deploy-pipeline-cf: compile-pipeline
 	cd src/trigger && \
 	gcloud functions deploy trigger-creature-pipeline \
 	--runtime=python310 --entry-point=trigger_pipeline \
 	--trigger-http --region=us-east1 --memory=512MB \
 	--source=. --allow-unauthenticated
+
+compile-pipeline:
+	python src/kubeflow/compile_pipeline.py
