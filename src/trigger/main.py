@@ -13,7 +13,7 @@ def trigger_pipeline(request):
     aiplatform.init(project=project, location=region,
                     staging_bucket=pipeline_root)
 
-    date_str = datetime.datetime.now().strftime("%Y%m%d")
+    date_str = datetime.datetime.now().strftime("%Y%m%d-%H%M")
     model_version = f"v-{date_str}"
 
     parameter_values = {
@@ -33,7 +33,7 @@ def trigger_pipeline(request):
         template_path=template_path,
         pipeline_root=pipeline_root,
         parameter_values=parameter_values,
-        enable_caching=True,
+        enable_caching=False,
     )
 
     # Start job and don't wait for it to finish

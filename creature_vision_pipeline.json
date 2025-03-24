@@ -612,7 +612,7 @@
               "parameters": {
                 "runtimeValue": {
                   "constant": {
-                    "max_files": "1000",
+                    "max_files": "100",
                     "version": "v-20250323"
                   }
                 }
