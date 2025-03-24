@@ -58,11 +58,11 @@ get-deps:
 	pip install pipreqs
 	pipreqs ./src/$(SERVICE) --savepath ./src/$(SERVICE)/requirements.txt --use-local --force
 
-build-image:
+build-push: auth-registry
 	docker buildx build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
 		--platform linux/amd64 \
 		-t ${IMAGE_TAG} \
-		--load
+		--push
 
 run-local:
 	docker-compose -f docker/$(SERVICE)/docker-compose.local.yaml build \
@@ -74,22 +74,12 @@ run-local:
 auth-registry:
 	gcloud auth configure-docker ${REGION}-docker.pkg.dev
 
+# Build image without pushing (disable BuildKit to avoid timeout issues)
+build:
+	DOCKER_BUILDKIT=0 docker build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
+		--platform linux/amd64 \
+		-t ${IMAGE_TAG}
 
-# Save the built image as a .tar file
-save:
-	docker save -o ${TAR_FILE} ${IMAGE_TAG}
-
-# Load the image from the .tar file and push it
-load-push: auth-registry
-	docker load -i ${TAR_FILE}
-	docker push ${IMAGE_TAG}
-
-# Clean up the local .tar file
-clean:
-	rm -f ${TAR_FILE}
-
-# Run all steps in one command
-build-push: build save load-push clean
 
 push-image: auth-registry
 	docker tag ${APP_NAME}:${VERSION} ${IMAGE_TAG}
@@ -162,4 +152,8 @@ deploy-pipeline-cf: compile-pipeline
 	--source=. --allow-unauthenticated
 
 compile-pipeline:
+	@echo "📦 Compiling Kubeflow pipeline..."
 	python src/kubeflow/compile_pipeline.py
+	@echo "🚀 Uploading pipeline JSON to GCS..."
+	gsutil cp creature_vision_pipeline.json gs://creature-vision-pipeline-artifacts/kubeflow-templates/
+	@echo "✅ Pipeline compilation and upload complete."
