@@ -36,8 +36,9 @@ def main():
     STAGING_BUCKET = os.getenv("STAGING_BUCKET", "creture-vision-ml-artifacts")
     AIP_TENSORBOARD_LOG_DIR = os.getenv(
         "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local")
-    model_gcs_path = f"gs://tf_models_cv/{args.previous_model_version}"
     NEW_VERSION = args.version
+    if args.previous_model_version == "None":
+        args.previous_model_version = None
 
     print(f"Starting training with version: {args.version}")
     print(f"Previous model version: {args.previous_model_version}")
@@ -59,7 +60,8 @@ def main():
     )
 
     # Model initialization
-    model = load_or_create_model(num_classes, model_gcs_path=model_gcs_path)
+    model = load_or_create_model(
+        num_classes, prev_version=args.previous_model_version)
     # Initialize Vertex AI experiment
     aiplatform.init(
         experiment=experiment_config["experiment_name"],

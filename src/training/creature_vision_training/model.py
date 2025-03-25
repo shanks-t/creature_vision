@@ -113,18 +113,18 @@ def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.ker
     return tf.keras.Model(inputs, outputs)
 
 
-def load_or_create_model(num_classes: int, model_gcs_path: str = None) -> tf.keras.Model:
+def load_or_create_model(num_classes: int, prev_version) -> tf.keras.Model:
     """Loads existing model or creates new one with dynamic class adaptation"""
-    if model_gcs_path:
+
+    # Be defensive: treat "None" string or empty string as no version
+    if prev_version and prev_version != "None":
         try:
-            # Load base model with preserved architecture
+            model_gcs_path = f"gs://tf_models_cv/{prev_version}"
             base_model = tf.keras.models.load_model(model_gcs_path)
             print(f"Loaded base model from {model_gcs_path}")
 
-            # Extract penultimate layer outputs
             penultimate_output = base_model.layers[-2].output
 
-            # Create new classifier head
             new_output = tf.keras.layers.Dense(
                 num_classes,
                 activation='softmax',
@@ -132,21 +132,23 @@ def load_or_create_model(num_classes: int, model_gcs_path: str = None) -> tf.ker
                 name='dynamic_classifier'
             )(penultimate_output)
 
-            # Reconstruct full model
             model = tf.keras.Model(
                 inputs=base_model.input,
                 outputs=new_output,
                 name=base_model.name + "_adapted"
             )
 
-            # Preserve previous layer weights
             for layer in model.layers[:-1]:
                 layer.set_weights(base_model.get_layer(
                     layer.name).get_weights())
 
         except Exception as e:
             print(f"Error adapting model: {str(e)}")
+            print(f"Falling back to creating a new base model...")
+            model = create_model(num_classes)
+
     else:
+        print("No previous model version provided. Creating new base model...")
         model = create_model(num_classes)
 
     return model

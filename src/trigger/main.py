@@ -13,7 +13,7 @@ def trigger_pipeline(request):
     aiplatform.init(project=project, location=region,
                     staging_bucket=pipeline_root)
 
-    date_str = datetime.datetime.now().strftime("%Y%m%d")
+    date_str = datetime.datetime.now().strftime("%Y%m%d%H")
     model_version = f"v-{date_str}"
 
     parameter_values = {
@@ -25,7 +25,9 @@ def trigger_pipeline(request):
         "inference_service": "dog-predictor",
         "python_package_gcs_uri": "gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz",
         "service_account": f"kubeflow-pipeline-sa@{project}.iam.gserviceaccount.com",
-        "gcs_template_path": "gs://dataflow-use1/templates/creature-vision-template.json"
+        "gcs_template_path": "gs://dataflow-use1/templates/creature-vision-template.json",
+        "model_version": model_version,
+        "max_files": "1200",
     }
 
     job = aiplatform.PipelineJob(
@@ -33,7 +35,7 @@ def trigger_pipeline(request):
         template_path=template_path,
         pipeline_root=pipeline_root,
         parameter_values=parameter_values,
-        enable_caching=True,
+        enable_caching=False,
     )
 
     # Start job and don't wait for it to finish

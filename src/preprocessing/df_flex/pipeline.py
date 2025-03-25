@@ -38,7 +38,7 @@ class GCSImagePathProvider(beam.PTransform):
             bucket = client.bucket(self.bucket_name)
 
             all_paths = []
-            for prefix in ['correct_predictions/', 'incorrect_predictions/']:
+            for prefix in ['incorrect_predictions/']:
                 # Correct method to list blobs
                 blobs = bucket.list_blobs(prefix=prefix)
                 for blob in blobs:

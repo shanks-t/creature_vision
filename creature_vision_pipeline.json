@@ -476,7 +476,7 @@
             "sh",
             "-ec",
             "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str) -> str:\n    \"\"\"Fetch the previous model version from GCS and return it as a string.\"\"\"\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v-\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v-\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n    return latest_model  # Directly returning the value\n\n"
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str) -> str:\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v-\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v-\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n    return latest_model\n\n"
           ],
           "image": "python:3.10"
         }
@@ -496,7 +496,7 @@
             "sh",
             "-ec",
             "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_interval: int = 30, timeout: int = 1800):\n    \"\"\"\n    Polls the Dataflow job status every `poll_interval` seconds until it reaches a terminal state\n    or the `timeout` is reached.\n    \"\"\"\n    from googleapiclient.discovery import build\n    import time\n\n    dataflow = build('dataflow', 'v1b3')\n    elapsed_time = 0\n    job_id = None\n\n    # Retrieve the job ID based on the job name\n    request = dataflow.projects().locations().jobs().list(\n        projectId=project_id, location=region)\n    while request is not None:\n        response = request.execute()\n        for job in response.get('jobs', []):\n            if job['name'] == job_name:\n                job_id = job['id']\n                break\n        request = dataflow.projects().locations().jobs().list_next(\n            previous_request=request, previous_response=response)\n        if job_id:\n            break\n\n    if not job_id:\n        raise ValueError(f\"No job found with name {job_name}\")\n\n    while elapsed_time < timeout:\n        job = dataflow.projects().locations().jobs().get(\n            projectId=project_id,\n            location=region,\n            jobId=job_id\n        ).execute()\n\n        state = job.get('currentState', 'UNKNOWN')\n        print(f\"Dataflow job {job_id} is in state: {state}\")\n\n        if state == 'JOB_STATE_DONE':\n            print(f\"Dataflow job {job_id} completed successfully.\")\n            return\n        elif state in ['JOB_STATE_FAILED', 'JOB_STATE_CANCELLED']:\n            raise RuntimeError(\n                f\"Dataflow job {job_id} failed with state: {state}\")\n\n        time.sleep(poll_interval)\n        elapsed_time += poll_interval\n\n    raise TimeoutError(\n        f\"Dataflow job {job_id} did not complete within the allotted time of {timeout} seconds.\")\n\n"
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_interval: int = 30, timeout: int = 1800):\n    from googleapiclient.discovery import build\n    import time\n\n    dataflow = build('dataflow', 'v1b3')\n    elapsed_time = 0\n    job_id = None\n\n    request = dataflow.projects().locations().jobs().list(\n        projectId=project_id, location=region)\n    while request is not None:\n        response = request.execute()\n        for job in response.get('jobs', []):\n            if job['name'] == job_name:\n                job_id = job['id']\n                break\n        request = dataflow.projects().locations().jobs().list_next(\n            previous_request=request, previous_response=response)\n        if job_id:\n            break\n\n    if not job_id:\n        raise ValueError(f\"No job found with name {job_name}\")\n\n    while elapsed_time < timeout:\n        job = dataflow.projects().locations().jobs().get(\n            projectId=project_id,\n            location=region,\n            jobId=job_id\n        ).execute()\n\n        state = job.get('currentState', 'UNKNOWN')\n        print(f\"Dataflow job {job_id} is in state: {state}\")\n\n        if state == 'JOB_STATE_DONE':\n            print(f\"Dataflow job {job_id} completed successfully.\")\n            return\n        elif state in ['JOB_STATE_FAILED', 'JOB_STATE_CANCELLED']:\n            raise RuntimeError(\n                f\"Dataflow job {job_id} failed with state: {state}\")\n\n        time.sleep(poll_interval)\n        elapsed_time += poll_interval\n\n    raise TimeoutError(\n        f\"Dataflow job {job_id} did not complete within the allotted time of {timeout} seconds.\")\n\n"
           ],
           "image": "python:3.10"
         }
@@ -523,6 +523,11 @@
           ],
           "inputs": {
             "parameters": {
+              "base_output_directory": {
+                "runtimeValue": {
+                  "constant": "{{$.inputs.parameters['pipelinechannel--pipeline_root']}}/training-outputs/{{$.inputs.parameters['pipelinechannel--model_version']}}"
+                }
+              },
               "display_name": {
                 "runtimeValue": {
                   "constant": "creature-vision-training"
@@ -536,6 +541,12 @@
                   "outputParameterKey": "Output",
                   "producerTask": "get-previous-model"
                 }
+              },
+              "pipelinechannel--model_version": {
+                "componentInputParameter": "model_version"
+              },
+              "pipelinechannel--pipeline_root": {
+                "componentInputParameter": "pipeline_root"
               },
               "pipelinechannel--python_package_gcs_uri": {
                 "componentInputParameter": "python_package_gcs_uri"
@@ -561,7 +572,7 @@
                       "python_package_spec": {
                         "args": [
                           "--version",
-                          "v-20250323",
+                          "{{$.inputs.parameters['pipelinechannel--model_version']}}",
                           "--previous_model_version",
                           "{{$.inputs.parameters['pipelinechannel--get-previous-model-Output']}}"
                         ],
@@ -596,7 +607,7 @@
               },
               "job_name": {
                 "runtimeValue": {
-                  "constant": "creature-vis-training-20250323"
+                  "constant": "creature-vis-training-{{$.inputs.parameters['pipelinechannel--model_version']}}"
                 }
               },
               "launch_options": {
@@ -612,10 +623,16 @@
               "parameters": {
                 "runtimeValue": {
                   "constant": {
-                    "max_files": "1000",
-                    "version": "v-20250323"
+                    "max_files": "{{$.inputs.parameters['pipelinechannel--max_files']}}",
+                    "version": "{{$.inputs.parameters['pipelinechannel--model_version']}}"
                   }
                 }
+              },
+              "pipelinechannel--max_files": {
+                "componentInputParameter": "max_files"
+              },
+              "pipelinechannel--model_version": {
+                "componentInputParameter": "model_version"
               },
               "service_account_email": {
                 "componentInputParameter": "service_account"
@@ -642,9 +659,7 @@
                 "componentInputParameter": "inference_image"
               },
               "model_version": {
-                "runtimeValue": {
-                  "constant": "v-20250323"
-                }
+                "componentInputParameter": "model_version"
               },
               "project_id": {
                 "componentInputParameter": "project_id"
@@ -693,8 +708,11 @@
             "parameters": {
               "job_name": {
                 "runtimeValue": {
-                  "constant": "creature-vis-training-20250323"
+                  "constant": "creature-vis-training-{{$.inputs.parameters['pipelinechannel--model_version']}}"
                 }
+              },
+              "pipelinechannel--model_version": {
+                "componentInputParameter": "model_version"
               },
               "project_id": {
                 "componentInputParameter": "project_id"
@@ -721,7 +739,15 @@
         "inference_service": {
           "parameterType": "STRING"
         },
+        "max_files": {
+          "defaultValue": "1000",
+          "isOptional": true,
+          "parameterType": "STRING"
+        },
         "model_bucket": {
+          "parameterType": "STRING"
+        },
+        "model_version": {
           "parameterType": "STRING"
         },
         "pipeline_root": {

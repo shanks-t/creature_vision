@@ -4,16 +4,13 @@ import datetime
 from kfp import dsl
 from kfp import compiler
 
-
 from google.cloud import aiplatform
 from google_cloud_pipeline_components.v1.dataflow import DataflowFlexTemplateJobOp
 from google_cloud_pipeline_components.v1.custom_job import CustomTrainingJobOp
 
 
-# Simplified get_previous_model component that returns a string
 @dsl.component(base_image="python:3.10", packages_to_install=["google-cloud-storage"])
 def get_previous_model(bucket_name: str) -> str:
-    """Fetch the previous model version from GCS and return it as a string."""
     from google.cloud import storage
     client = storage.Client()
     bucket = client.bucket(bucket_name)
@@ -25,15 +22,11 @@ def get_previous_model(bucket_name: str) -> str:
     )
 
     latest_model = model_versions[0] if model_versions else "None"
-    return latest_model  # Directly returning the value
+    return latest_model
 
 
 @dsl.component(base_image="python:3.10", packages_to_install=["google-api-python-client"])
 def wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_interval: int = 30, timeout: int = 1800):
-    """
-    Polls the Dataflow job status every `poll_interval` seconds until it reaches a terminal state
-    or the `timeout` is reached.
-    """
     from googleapiclient.discovery import build
     import time
 
@@ -41,7 +34,6 @@ def wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_inte
     elapsed_time = 0
     job_id = None
 
-    # Retrieve the job ID based on the job name
     request = dataflow.projects().locations().jobs().list(
         projectId=project_id, location=region)
     while request is not None:
@@ -106,7 +98,6 @@ def deploy_cloud_run_inference_service(
     )
 
 
-# Pipeline definition
 @dsl.pipeline(
     name="creature-vision-pipeline",
     description="Pipeline that orchestrates Dataflow preprocessing, training, and Cloud Run deployment."
@@ -120,41 +111,38 @@ def creature_vision_pipeline(
     inference_service: str,
     python_package_gcs_uri: str,
     service_account: str,
-    gcs_template_path: str
+    gcs_template_path: str,
+    model_version: str,
+    max_files: str = "1000"
 ):
-    """Kubeflow Pipeline that runs a Dataflow Flex Template job after retrieving the previous model."""
-    date_str = datetime.datetime.now().strftime("%Y%m%d")
-    model_version = f"v-{date_str}"
 
-    # Task to get the previous model version
     get_previous_model_task = get_previous_model(bucket_name=model_bucket)
 
-   # Define the Dataflow task
-    df_job_name = f"creature-vis-training-{date_str}"
+    df_job_name = f"creature-vis-training-{model_version}"
     dataflow_task = DataflowFlexTemplateJobOp(
         location=region,
         container_spec_gcs_path=gcs_template_path,
         job_name=df_job_name,
         parameters={
             "version": model_version,
-            "max_files": "1000"
+            "max_files": max_files
         },
         service_account_email=service_account,
         launch_options={"enable_preflight_validation": "false"},
     )
 
-    # Wait for Dataflow job to complete
     wait_task = wait_for_dataflow_job(
         project_id=project_id,
         region=region,
         job_name=df_job_name
     ).after(dataflow_task)
-    # available images https://cloud.google.com/vertex-ai/docs/training/pre-built-containers
+
     training_task = CustomTrainingJobOp(
         display_name="creature-vision-training",
         project=project_id,
         location=region,
         tensorboard="projects/284159624099/locations/us-east1/tensorboards/3018185806524186624",
+        base_output_directory=f"{pipeline_root}/training-outputs/{model_version}",
         worker_pool_specs=[
             {
                 "machine_spec": {
@@ -184,56 +172,7 @@ def creature_vision_pipeline(
     ).after(training_task)
 
 
-# Compile the pipeline
 compiler.Compiler().compile(
     pipeline_func=creature_vision_pipeline,
     package_path="creature_vision_pipeline.json"
 )
-
-# Project Configuration
-PROJECT_ID = "creature-vision"
-REGION = "us-east1"
-PIPELINE_ROOT = f"gs://creature-vision-pipeline-artifacts"
-SERVICE_ACCOUNT = f"kubeflow-pipeline-sa@{PROJECT_ID}.iam.gserviceaccount.com"
-GCS_TEMPLATE_PATH = "gs://dataflow-use1/templates/creature-vision-template.json"
-INFERENCE_SERVICE_NAME = "dog-predictor"
-
-# Artifact Registry URIs
-ARTIFACT_REGISTRY = f"{REGION}-docker.pkg.dev/{PROJECT_ID}"
-INFERENCE_IMAGE = f"{ARTIFACT_REGISTRY}/dog-prediction-app/inference:latest"
-
-
-# GCS Artifacts
-MODEL_BUCKET = "tf_models_cv"
-PYTHON_PACKAGE_URI = "gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz"
-
-# Initialize Vertex AI
-aiplatform.init(
-    project=PROJECT_ID,
-    location=REGION,
-    staging_bucket=PIPELINE_ROOT
-)
-
-# Define pipeline parameters
-parameter_values = {
-    "project_id": PROJECT_ID,
-    "region": REGION,
-    "pipeline_root": PIPELINE_ROOT,
-    "model_bucket": MODEL_BUCKET,
-    "inference_image": INFERENCE_IMAGE,
-    "inference_service": INFERENCE_SERVICE_NAME,
-    "python_package_gcs_uri": PYTHON_PACKAGE_URI,
-    "service_account": SERVICE_ACCOUNT,
-    "gcs_template_path": GCS_TEMPLATE_PATH
-}
-
-# Create and run the pipeline job
-# pipeline_job = aiplatform.PipelineJob(
-#     display_name="creature-vision-pipeline-job",
-#     template_path="creature_vision_pipeline.json",
-#     pipeline_root=PIPELINE_ROOT,
-#     parameter_values=parameter_values,
-#     enable_caching=True,
-# )
-
-# pipeline_job.run(service_account=SERVICE_ACCOUNT)

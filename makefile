@@ -58,11 +58,11 @@ get-deps:
 	pip install pipreqs
 	pipreqs ./src/$(SERVICE) --savepath ./src/$(SERVICE)/requirements.txt --use-local --force
 
-build:
+build-push: auth-registry
 	docker buildx build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
 		--platform linux/amd64 \
 		-t ${IMAGE_TAG} \
-		--load
+		--push
 
 run-local:
 	docker-compose -f docker/$(SERVICE)/docker-compose.local.yaml build \
@@ -80,21 +80,6 @@ build:
 		--platform linux/amd64 \
 		-t ${IMAGE_TAG}
 
-# Save the built image as a .tar file
-save:
-	docker save -o ${TAR_FILE} ${IMAGE_TAG}
-
-# Load the image from the .tar file and push it
-load-push: auth-registry
-	docker load -i ${TAR_FILE}
-	docker push ${IMAGE_TAG}
-
-# Clean up the local .tar file
-clean:
-	rm -f ${TAR_FILE}
-
-# Run all steps in one command
-build-push: build save load-push clean
 
 push-image: auth-registry
 	docker tag ${APP_NAME}:${VERSION} ${IMAGE_TAG}
@@ -156,12 +141,19 @@ check-pkg:
 test-run-inf:
 	curl -X GET https://dog-predictor-284159624099.us-east1.run.app/predict/
 
-test-pipelin-cf:
+test-pipeline-cf:
 	curl -X POST https://us-east1-creature-vision.cloudfunctions.net/trigger-creature-pipeline
 
-deploy-pipelin-cf:
+deploy-pipeline-cf: compile-pipeline
 	cd src/trigger && \
 	gcloud functions deploy trigger-creature-pipeline \
 	--runtime=python310 --entry-point=trigger_pipeline \
 	--trigger-http --region=us-east1 --memory=512MB \
 	--source=. --allow-unauthenticated
+
+compile-pipeline:
+	@echo "📦 Compiling Kubeflow pipeline..."
+	python src/kubeflow/compile_pipeline.py
+	@echo "🚀 Uploading pipeline JSON to GCS..."
+	gsutil cp creature_vision_pipeline.json gs://creature-vision-pipeline-artifacts/kubeflow-templates/
+	@echo "✅ Pipeline compilation and upload complete."
