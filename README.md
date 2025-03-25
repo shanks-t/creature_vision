@@ -92,14 +92,11 @@ graph TD;
    git clone https://github.com/your-repo/creature-vision.git
    cd creature-vision
    ```
-2. Build & push Docker images:
-   ```sh
-   make build && make push
-   ```
-3. Deploy the system:
-   ```sh
-   make deploy
-   ```
+2. Build and push images for Inference and Preprocessing services
+
+3. Compile and deploy the kubeflow pipeline
+
+4. Create Cloud function trigger with kubeflow .json and invoke the CF
 
 ## **Monitoring & Visualization**
 
