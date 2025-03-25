@@ -226,7 +226,6 @@
         },
         {
             "datasource": {
-                "default": true,
                 "type": "grafana-bigquery-datasource",
                 "uid": "P0871A590F805E5CD"
             },
@@ -239,11 +238,10 @@
                         "axisBorderShow": false,
                         "axisCenteredZero": false,
                         "axisColorMode": "text",
-                        "axisGridShow": true,
                         "axisLabel": "",
                         "axisPlacement": "auto",
                         "fillOpacity": 80,
-                        "gradientMode": "opacity",
+                        "gradientMode": "none",
                         "hideFrom": {
                             "legend": false,
                             "tooltip": false,
@@ -257,7 +255,6 @@
                             "mode": "off"
                         }
                     },
-                    "fieldMinMax": false,
                     "mappings": [],
                     "thresholds": {
                         "mode": "absolute",
@@ -273,71 +270,47 @@
                         ]
                     }
                 },
-                "overrides": [
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "12"
-                        },
-                        "properties": [
-                            {
-                                "id": "color",
-                                "value": {
-                                    "fixedColor": "red",
-                                    "mode": "fixed"
-                                }
-                            }
-                        ]
-                    }
-                ]
+                "overrides": []
             },
             "gridPos": {
-                "h": 8,
-                "w": 12,
+                "h": 10,
+                "w": 24,
                 "x": 0,
                 "y": 8
             },
-            "id": 3,
+            "id": 5,
             "options": {
-                "barRadius": 0.2,
-                "barWidth": 0.67,
-                "colorByField": "actual_count",
-                "fullHighlight": true,
+                "barRadius": 0.1,
+                "barWidth": 0.85,
+                "colorByField": "model_version",
+                "fullHighlight": false,
                 "groupWidth": 0.7,
                 "legend": {
                     "calcs": [],
                     "displayMode": "list",
                     "placement": "bottom",
-                    "showLegend": false
+                    "showLegend": true
                 },
                 "orientation": "auto",
                 "showValue": "auto",
                 "stacking": "none",
-                "text": {
-                    "valueSize": 3
-                },
                 "tooltip": {
                     "hideZeros": false,
                     "mode": "single",
                     "sort": "none"
                 },
-                "xField": "actual",
-                "xTickLabelRotation": -60,
+                "xTickLabelRotation": -65,
                 "xTickLabelSpacing": 0
             },
             "pluginVersion": "11.5.2",
             "targets": [
                 {
-                    "datasource": {
-                        "type": "grafana-bigquery-datasource",
-                        "uid": "P0871A590F805E5CD"
-                    },
                     "editorMode": "code",
                     "format": 1,
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "select count(actual) as actual_count, actual from `creature-vision.dog_prediction_app.prediction_metrics`\nwhere is_correct = false\nand model_version = '${model_version}'\ngroup by actual\norder by actual_count desc\nLIMIT 25;\n",
+                    "rawSql": "WITH correct_preds AS (\nSELECT actual, model_version, count(*) as num_correct\nFROM `creature-vision.dog_prediction_app.prediction_metrics` \nWHERE is_correct = true\ngroup by model_version, actual\n),\ntotal_preds as (\nSELECT actual, model_version, count(*) as num_total\nFROM `creature-vision.dog_prediction_app.prediction_metrics` \ngroup by model_version, actual\n)\nselect tp.actual, tp.model_version, (IFNULL(ip.num_correct, 0)/tp.num_total * 100) as percent_correct\nfrom total_preds tp\nleft join correct_preds ip\non ip.actual = tp.actual and ip.model_version = tp.model_version\nwhere tp.model_version = '${model_version}'\norder by percent_correct desc",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -358,7 +331,7 @@
                     }
                 }
             ],
-            "title": "Top Misclassified Dog Breeds $model_version",
+            "title": "Predictions % Correct by Model Version",
             "type": "barchart"
         },
         {
@@ -429,7 +402,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 16
+                "y": 18
             },
             "id": 1,
             "options": {
@@ -482,6 +455,143 @@
             ],
             "title": "\"Prediction Accuracy - Model Version: ${model_version}\"",
             "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "default": true,
+                "type": "grafana-bigquery-datasource",
+                "uid": "P0871A590F805E5CD"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisGridShow": true,
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "fillOpacity": 80,
+                        "gradientMode": "opacity",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 1,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "fieldMinMax": false,
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "12"
+                        },
+                        "properties": [
+                            {
+                                "id": "color",
+                                "value": {
+                                    "fixedColor": "red",
+                                    "mode": "fixed"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 5,
+                "y": 28
+            },
+            "id": 3,
+            "options": {
+                "barRadius": 0.2,
+                "barWidth": 0.67,
+                "colorByField": "actual_count",
+                "fullHighlight": true,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": false
+                },
+                "orientation": "auto",
+                "showValue": "auto",
+                "stacking": "none",
+                "text": {
+                    "valueSize": 3
+                },
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "single",
+                    "sort": "none"
+                },
+                "xField": "actual",
+                "xTickLabelRotation": -60,
+                "xTickLabelSpacing": 0
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "grafana-bigquery-datasource",
+                        "uid": "P0871A590F805E5CD"
+                    },
+                    "editorMode": "code",
+                    "format": 1,
+                    "location": "",
+                    "project": "creature-vision",
+                    "rawQuery": true,
+                    "rawSql": "select count(actual) as actual_count, actual from `creature-vision.dog_prediction_app.prediction_metrics`\nwhere is_correct = false\nand model_version = '${model_version}'\ngroup by actual\norder by actual_count desc\nLIMIT 25;\n",
+                    "refId": "A",
+                    "sql": {
+                        "columns": [
+                            {
+                                "parameters": [],
+                                "type": "function"
+                            }
+                        ],
+                        "groupBy": [
+                            {
+                                "property": {
+                                    "type": "string"
+                                },
+                                "type": "groupBy"
+                            }
+                        ],
+                        "limit": 50
+                    }
+                }
+            ],
+            "title": "Top Misclassified Dog Breeds $model_version",
+            "type": "barchart"
         }
     ],
     "preload": false,
@@ -492,8 +602,8 @@
         "list": [
             {
                 "current": {
-                    "text": "v-20250323",
-                    "value": "v-20250323"
+                    "text": "v-2025032500",
+                    "value": "v-2025032500"
                 },
                 "datasource": {
                     "type": "grafana-bigquery-datasource",
@@ -536,13 +646,13 @@
         ]
     },
     "time": {
-        "from": "now/w",
-        "to": "now/w"
+        "from": "now-2d",
+        "to": "now"
     },
     "timepicker": {},
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 4,
+    "version": 12,
     "weekStart": ""
 }
