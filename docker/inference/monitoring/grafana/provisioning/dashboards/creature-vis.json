@@ -232,7 +232,7 @@
             "fieldConfig": {
                 "defaults": {
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
                     "custom": {
                         "axisBorderShow": false,
@@ -262,10 +262,6 @@
                             {
                                 "color": "green",
                                 "value": null
-                            },
-                            {
-                                "color": "red",
-                                "value": 80
                             }
                         ]
                     }
@@ -299,7 +295,7 @@
                     "mode": "single",
                     "sort": "none"
                 },
-                "xTickLabelRotation": -65,
+                "xTickLabelRotation": -75,
                 "xTickLabelSpacing": 0
             },
             "pluginVersion": "11.5.2",
@@ -310,7 +306,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "WITH correct_preds AS (\nSELECT actual, model_version, count(*) as num_correct\nFROM `creature-vision.dog_prediction_app.prediction_metrics` \nWHERE is_correct = true\ngroup by model_version, actual\n),\ntotal_preds as (\nSELECT actual, model_version, count(*) as num_total\nFROM `creature-vision.dog_prediction_app.prediction_metrics` \ngroup by model_version, actual\n)\nselect tp.actual, tp.model_version, (IFNULL(ip.num_correct, 0)/tp.num_total * 100) as percent_correct\nfrom total_preds tp\nleft join correct_preds ip\non ip.actual = tp.actual and ip.model_version = tp.model_version\nwhere tp.model_version = '${model_version}'\norder by percent_correct desc",
+                    "rawSql": "WITH correct_preds AS (\nSELECT actual, model_version, count(*) as num_correct\nFROM `creature-vision.dog_prediction_app.prediction_metrics` \nWHERE is_correct = true\ngroup by model_version, actual\n),\ntotal_preds as (\nSELECT actual, model_version, count(*) as num_total\nFROM `creature-vision.dog_prediction_app.prediction_metrics` \ngroup by model_version, actual\n)\nselect tp.actual, tp.model_version,\n((IFNULL(ip.num_correct, 0)) * (IFNULL(ip.num_correct, 0)/tp.num_total * 100)) as correctness\nfrom total_preds tp\nleft join correct_preds ip\non ip.actual = tp.actual and ip.model_version = tp.model_version\nwhere tp.model_version = '${model_version}'\nand ((IFNULL(ip.num_correct, 0)) * (IFNULL(ip.num_correct, 0)/tp.num_total * 100)) > 0\norder by correctness desc",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -331,7 +327,113 @@
                     }
                 }
             ],
-            "title": "Predictions % Correct by Model Version",
+            "title": "Correctness (% correct * num correct) by Class",
+            "type": "barchart"
+        },
+        {
+            "datasource": {
+                "type": "grafana-bigquery-datasource",
+                "uid": "P0871A590F805E5CD"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "fillOpacity": 80,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 1,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 18
+            },
+            "id": 6,
+            "options": {
+                "barRadius": 0.1,
+                "barWidth": 0.85,
+                "colorByField": "model_version",
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "orientation": "auto",
+                "showValue": "auto",
+                "stacking": "none",
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "single",
+                    "sort": "none"
+                },
+                "xTickLabelRotation": -75,
+                "xTickLabelSpacing": 0
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "format": 1,
+                    "location": "",
+                    "project": "creature-vision",
+                    "rawQuery": true,
+                    "rawSql": "WITH correct_preds AS (\nSELECT actual, model_version, count(*) as num_correct\nFROM `creature-vision.dog_prediction_app.prediction_metrics` \nWHERE is_correct = true\ngroup by model_version, actual\n),\ntotal_preds as (\nSELECT actual, model_version, count(*) as num_total\nFROM `creature-vision.dog_prediction_app.prediction_metrics` \ngroup by model_version, actual\n),\nincorrect_preds as (\nSELECT actual, model_version, count(*) as num_incorrect\nFROM `creature-vision.dog_prediction_app.prediction_metrics`\nWHERE is_correct != true\ngroup by model_version, actual\n)\nselect tp.actual, tp.model_version,\nIFNULL(ic.num_incorrect, 0) as num_incorrect,\nfrom total_preds tp\nleft join correct_preds ip\non ip.actual = tp.actual and ip.model_version = tp.model_version\nleft join incorrect_preds ic\non ic.actual = tp.actual and ic.model_version = tp.model_version\nwhere tp.model_version = '${model_version}'\nand ((IFNULL(ip.num_correct, 0)) * (IFNULL(ip.num_correct, 0)/tp.num_total * 100)) < 5\norder by IFNULL(ic.num_incorrect, 0) desc",
+                    "refId": "A",
+                    "sql": {
+                        "columns": [
+                            {
+                                "parameters": [],
+                                "type": "function"
+                            }
+                        ],
+                        "groupBy": [
+                            {
+                                "property": {
+                                    "type": "string"
+                                },
+                                "type": "groupBy"
+                            }
+                        ],
+                        "limit": 50
+                    }
+                }
+            ],
+            "title": "Incorrectness Class by num Incorrect",
             "type": "barchart"
         },
         {
@@ -402,7 +504,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 18
+                "y": 28
             },
             "id": 1,
             "options": {
@@ -527,7 +629,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 5,
-                "y": 28
+                "y": 38
             },
             "id": 3,
             "options": {
@@ -602,8 +704,8 @@
         "list": [
             {
                 "current": {
-                    "text": "v-2025032500",
-                    "value": "v-2025032500"
+                    "text": "v-2025032807",
+                    "value": "v-2025032807"
                 },
                 "datasource": {
                     "type": "grafana-bigquery-datasource",
@@ -653,6 +755,6 @@
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 12,
+    "version": 22,
     "weekStart": ""
 }
