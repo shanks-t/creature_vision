@@ -142,7 +142,9 @@ test-run-inf:
 	curl -X GET https://dog-predictor-284159624099.us-east1.run.app/predict/
 
 test-pipeline-cf:
-	curl -X POST https://us-east1-creature-vision.cloudfunctions.net/trigger-creature-pipeline
+	curl -X POST https://us-east1-creature-vision.cloudfunctions.net/trigger-creature-pipeline \
+	-H "Content-Type: application/json" \
+	-d '{"max_files": "$(MAX_FILES)"}'
 
 deploy-pipeline-cf: compile-pipeline
 	cd src/trigger && \
