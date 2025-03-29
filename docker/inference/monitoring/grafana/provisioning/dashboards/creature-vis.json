@@ -433,7 +433,7 @@
                     }
                 }
             ],
-            "title": "Incorrectness Class by num Incorrect",
+            "title": "Num Incorrect by Class",
             "type": "barchart"
         },
         {
@@ -755,6 +755,6 @@
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 22,
+    "version": 24,
     "weekStart": ""
 }
