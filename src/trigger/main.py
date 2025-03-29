@@ -1,6 +1,7 @@
 from google.cloud import aiplatform
 import functions_framework
 import datetime
+import json
 
 
 @functions_framework.http
@@ -16,6 +17,20 @@ def trigger_pipeline(request):
     date_str = datetime.datetime.now().strftime("%Y%m%d%H")
     model_version = f"v-{date_str}"
 
+    # Try to get max_files from request body or query params
+    default_max_files = "1200"
+    max_files = default_max_files
+
+    if request.method == 'POST':
+        try:
+            request_json = request.get_json(silent=True)
+            if request_json and 'max_files' in request_json:
+                max_files = str(request_json['max_files'])
+        except Exception:
+            pass
+    elif request.method == 'GET':
+        max_files = request.args.get('max_files', default_max_files)
+
     parameter_values = {
         "project_id": project,
         "region": region,
@@ -27,7 +42,7 @@ def trigger_pipeline(request):
         "service_account": f"kubeflow-pipeline-sa@{project}.iam.gserviceaccount.com",
         "gcs_template_path": "gs://dataflow-use1/templates/creature-vision-template.json",
         "model_version": model_version,
-        "max_files": "1200",
+        "max_files": max_files,
     }
 
     job = aiplatform.PipelineJob(
@@ -38,7 +53,6 @@ def trigger_pipeline(request):
         enable_caching=False,
     )
 
-    # Start job and don't wait for it to finish
     job.submit(service_account=parameter_values["service_account"])
 
     return {
@@ -46,5 +60,6 @@ def trigger_pipeline(request):
         "job_name": job.display_name,
         "create_time": str(job.create_time),
         "state": job.state.name,
+        "max_files": max_files,
         "pipeline_url": f"https://console.cloud.google.com/vertex-ai/locations/{region}/pipelines/runs/{job.resource_name.split('/')[-1]}?project={project}"
     }, 200
