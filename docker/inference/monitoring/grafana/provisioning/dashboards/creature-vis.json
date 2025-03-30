@@ -657,7 +657,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, HOUR) AS time,\n  AVG(CAST(is_correct AS INT64)) AS accuracy,\n  model_version\nFROM\n  `dog_prediction_app.prediction_metrics`\nWHERE\n  timestamp BETWEEN TIMESTAMP('${__from:date}') AND TIMESTAMP('${__to:date}')\n  AND model_version IN (${model_version:sqlstring})\nGROUP BY\n  time, model_version\nORDER BY\n  time",
+                    "rawSql": "SELECT\n  TIMESTAMP_TRUNC(timestamp, HOUR) AS time,\n  AVG(CAST(is_correct AS INT64)) AS accuracy,\n  model_version\nFROM\n  `dog_prediction_app.prediction_metrics`\nWHERE\n  timestamp BETWEEN TIMESTAMP('${__from:date}') AND TIMESTAMP('${__to:date}')\n  AND model_version IN (${model_versions:sqlstring})\nGROUP BY\n  time, model_version\nORDER BY\n  time",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -679,7 +679,7 @@
                     "table": "prediction_metrics"
                 }
             ],
-            "title": "\"Prediction Accuracy - Model Version: ${model_version}\"",
+            "title": "\"Prediction Accuracy - Model Version: ${model_versions}\"",
             "type": "timeseries"
         },
         {
@@ -718,7 +718,8 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green"
+                                "color": "green",
+                                "value": null
                             }
                         ]
                     }
@@ -763,7 +764,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "WITH correct_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_correct\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = true\n  GROUP BY model_version, actual\n),\nincorrect_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_incorrect\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = false\n  GROUP BY model_version, actual\n),\nmodel_summary AS (\n  SELECT\n    COALESCE(cp.model_version, ip.model_version) AS model_version,\n    COALESCE(cp.actual, ip.actual) AS actual,\n    SUM(IFNULL(cp.num_correct, 0)) AS total_correct_predictions,\n    SUM(IFNULL(ip.num_incorrect, 0)) AS total_incorrect_predictions\n  FROM correct_preds cp\n  FULL OUTER JOIN incorrect_preds ip\n    ON cp.model_version = ip.model_version AND cp.actual = ip.actual\n  GROUP BY model_version, actual\n)\nSELECT total_correct_predictions,model_version, actual\nFROM model_summary\nWHERE model_version in (${model_version})\nAND total_correct_predictions > 0\nORDER BY total_correct_predictions DESC",
+                    "rawSql": "WITH correct_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_correct\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = true\n  GROUP BY model_version, actual\n),\nincorrect_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_incorrect\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = false\n  GROUP BY model_version, actual\n),\nmodel_summary AS (\n  SELECT\n    COALESCE(cp.model_version, ip.model_version) AS model_version,\n    COALESCE(cp.actual, ip.actual) AS actual,\n    SUM(IFNULL(cp.num_correct, 0)) AS total_correct_predictions,\n    SUM(IFNULL(ip.num_incorrect, 0)) AS total_incorrect_predictions\n  FROM correct_preds cp\n  FULL OUTER JOIN incorrect_preds ip\n    ON cp.model_version = ip.model_version AND cp.actual = ip.actual\n  GROUP BY model_version, actual\n)\nSELECT total_correct_predictions,model_version, actual\nFROM model_summary\nWHERE model_version = '${model_version_A}'\nAND total_correct_predictions > 0\nORDER BY total_correct_predictions DESC",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -784,7 +785,7 @@
                     }
                 }
             ],
-            "title": "Num Correct by Class for ${model_version}",
+            "title": "Num Correct by Class for ${model_version_A}",
             "type": "barchart"
         },
         {
@@ -823,7 +824,8 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green"
+                                "color": "green",
+                                "value": null
                             }
                         ]
                     }
@@ -869,7 +871,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "WITH correct_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_correct\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = true\n  GROUP BY model_version, actual\n),\nincorrect_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_incorrect\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = false\n  GROUP BY model_version, actual\n),\nmodel_summary AS (\n  SELECT\n    COALESCE(cp.model_version, ip.model_version) AS model_version,\n    COALESCE(cp.actual, ip.actual) AS actual,\n    SUM(IFNULL(cp.num_correct, 0)) AS total_correct_predictions,\n    SUM(IFNULL(ip.num_incorrect, 0)) AS total_incorrect_predictions\n  FROM correct_preds cp\n  FULL OUTER JOIN incorrect_preds ip\n    ON cp.model_version = ip.model_version AND cp.actual = ip.actual\n  GROUP BY model_version, actual\n)\nSELECT total_incorrect_predictions,model_version, actual\nFROM model_summary\nWHERE model_version in (${model_version})\nAND total_incorrect_predictions > 0\nORDER BY total_incorrect_predictions DESC",
+                    "rawSql": "WITH correct_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_correct\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = true\n  GROUP BY model_version, actual\n),\nincorrect_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_incorrect\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = false\n  GROUP BY model_version, actual\n),\nmodel_summary AS (\n  SELECT\n    COALESCE(cp.model_version, ip.model_version) AS model_version,\n    COALESCE(cp.actual, ip.actual) AS actual,\n    SUM(IFNULL(cp.num_correct, 0)) AS total_correct_predictions,\n    SUM(IFNULL(ip.num_incorrect, 0)) AS total_incorrect_predictions\n  FROM correct_preds cp\n  FULL OUTER JOIN incorrect_preds ip\n    ON cp.model_version = ip.model_version AND cp.actual = ip.actual\n  GROUP BY model_version, actual\n)\nSELECT total_incorrect_predictions,model_version, actual\nFROM model_summary\nWHERE model_version = '${model_version_A}'\nAND total_incorrect_predictions > 0\nORDER BY total_incorrect_predictions DESC",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -890,7 +892,7 @@
                     }
                 }
             ],
-            "title": "Num Incorrect by Class for ${model_version}",
+            "title": "Num Incorrect by Class for ${model_version_A}",
             "type": "barchart"
         }
     ],
@@ -1084,6 +1086,6 @@
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 66,
+    "version": 71,
     "weekStart": ""
 }
