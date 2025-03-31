@@ -1,7 +1,32 @@
-from google.cloud import aiplatform
+from google.cloud import aiplatform, storage
 import functions_framework
-import datetime
 import json
+
+VERSION_FILE = "gs://creature-vision-pipeline-artifacts/version.txt"
+BASE_VERSION = "3_0"
+
+
+def read_version_from_gcs(bucket_name, blob_name):
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    if not blob.exists():
+        return BASE_VERSION
+
+    return blob.download_as_text().strip()
+
+
+def write_version_to_gcs(bucket_name, blob_name, version):
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+    blob.upload_from_string(version)
+
+
+def bump_minor_version(version: str) -> str:
+    major, minor = version.split("_")
+    return f"{major}_{int(minor) + 1}"
 
 
 @functions_framework.http
@@ -9,15 +34,23 @@ def trigger_pipeline(request):
     project = "creature-vision"
     region = "us-east1"
     pipeline_root = "gs://creature-vision-pipeline-artifacts"
-    template_path = "gs://creature-vision-pipeline-artifacts/kubeflow-templates/creature_vision_pipeline.json"
+    template_path = f"{pipeline_root}/kubeflow-templates/creature_vision_pipeline.json"
+
+    # Parse GCS path
+    version_bucket = VERSION_FILE.replace("gs://", "").split("/")[0]
+    version_blob = "/".join(VERSION_FILE.replace("gs://", "").split("/")[1:])
+
+    # Read and bump version
+    current_version = read_version_from_gcs(version_bucket, version_blob)
+    new_version = bump_minor_version(current_version)
+    write_version_to_gcs(version_bucket, version_blob, new_version)
 
     aiplatform.init(project=project, location=region,
                     staging_bucket=pipeline_root)
 
-    date_str = datetime.datetime.now().strftime("%Y%m%d%H")
-    model_version = f"v-{date_str}"
+    # Use bumped version
+    model_version = f"v{new_version}"
 
-    # Try to get max_files from request body or query params
     default_max_files = "1200"
     max_files = default_max_files
 
@@ -46,7 +79,7 @@ def trigger_pipeline(request):
     }
 
     job = aiplatform.PipelineJob(
-        display_name=f"creature-vision-pipeline-job-{date_str}",
+        display_name=f"creature-vision-pipeline-job-{model_version}",
         template_path=template_path,
         pipeline_root=pipeline_root,
         parameter_values=parameter_values,
@@ -58,7 +91,7 @@ def trigger_pipeline(request):
     return {
         "message": "Pipeline job submitted successfully",
         "job_name": job.display_name,
-        "create_time": str(job.create_time),
+        "model_version": model_version,
         "state": job.state.name,
         "max_files": max_files,
         "pipeline_url": f"https://console.cloud.google.com/vertex-ai/locations/{region}/pipelines/runs/{job.resource_name.split('/')[-1]}?project={project}"
