@@ -14,10 +14,10 @@ def get_previous_model(bucket_name: str) -> str:
     from google.cloud import storage
     client = storage.Client()
     bucket = client.bucket(bucket_name)
-    blobs = list(bucket.list_blobs(prefix="v-"))
+    blobs = list(bucket.list_blobs(prefix="v"))
 
     model_versions = sorted(
-        [blob.name for blob in blobs if "v-" in blob.name],
+        [blob.name for blob in blobs if "v" in blob.name],
         reverse=True
     )
 
@@ -118,7 +118,7 @@ def creature_vision_pipeline(
 
     get_previous_model_task = get_previous_model(bucket_name=model_bucket)
 
-    df_job_name = f"creature-vis-training-{model_version}"
+    df_job_name = f"creature-vis-training-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
     dataflow_task = DataflowFlexTemplateJobOp(
         location=region,
         container_spec_gcs_path=gcs_template_path,
