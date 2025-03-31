@@ -44,7 +44,7 @@ def main():
     print(f"Previous model version: {args.previous_model_version}")
 
     experiment_config = {
-        "experiment_name": f"{NEW_VERSION}",
+        "experiment_name": f"{NEW_VERSION.replace('_', '-')}",
         "project_id": PROJECT_ID,
         "location": LOCATION,
         "staging_bucket": STAGING_BUCKET
