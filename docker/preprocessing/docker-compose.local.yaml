@@ -1,23 +1,40 @@
+version: "3.9"
+
 services:
   creature-vis-processing:
     build:
-      context: ../../
-      dockerfile: docker/preprocessing/Dockerfile
+      context: ../../src/preprocessing
+      dockerfile: ../../docker/preprocessing/Dockerfile
       args:
         - BUILDPLATFORM=linux/arm64
         - TARGETARCH=arm64
     image: preprocessing:local
     platform: linux/arm64
-    command: ["local", "--project=creature-vision", "--runner=DirectRunner"]
+
+    entrypoint: ["python", "-m", "df_flex.main"]
+    
+    command:
+      [
+        "--project=creature-vision",
+        "--region=us-east1",
+        "--temp_location=gs://dataflow-use1/temp",          
+        "--staging_location=gs://dataflow-use1/staging",    
+        "--output_path=gs://creature-vision-training-set/local_processed", 
+        "--max_files=32",
+        "--version=local-dev"
+      ]
+
     ports:
       - "8080:8080"
+
     volumes:
       - ~/.config/gcloud:/root/.config/gcloud
+
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
-      - NUM_EXAMPLES=32
       - GOOGLE_CLOUD_PROJECT=creature-vision
       - CLOUD_LOCATION=us-east1
+
     deploy:
       resources:
         limits:

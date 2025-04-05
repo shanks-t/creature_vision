@@ -19,6 +19,31 @@ from df_flex.labels import update_label_map
 logger = setup_logger('pipeline')
 
 
+class FormatLabelStatsForBigQuery(beam.DoFn):
+    def __init__(self, model_version: str):
+        self.model_version = model_version
+
+    def process(self, element, timestamp=beam.DoFn.TimestampParam):
+        """
+        element: Tuple[((class_name: str, label_id: int), count: int)]
+        """
+        (class_name, label_id), example_count = element
+
+        # Handle undefined or invalid timestamp
+        try:
+            ts_str = timestamp.to_rfc3339()
+        except OverflowError:
+            ts_str = datetime.utcnow().isoformat() + 'Z'
+
+        yield {
+            'model_version': self.model_version,
+            'class_label': class_name,
+            'label_id': label_id,
+            'example_count': example_count,
+            'run_timestamp': ts_str
+        }
+
+
 class GCSImagePathProvider(beam.PTransform):
     """Provides image paths from GCS for streaming processing"""
 
@@ -79,18 +104,19 @@ class ProcessImageAndLabel(beam.DoFn):
 
             # Check if the label blob exists, and if not, skip this entry
             if not label_blob.exists():
-                return []  # Label missing, skip this image
+                return  # Label missing, skip this image
 
             image_bytes = image_blob.download_as_bytes()
             label_json = label_blob.download_as_text()
             label = json.loads(label_json)
+            class_name = label['api_label']
+            label_id = self.label_map.get(class_name)
 
-            label_id = self.label_map.get(label['api_label'])
             if label_id is None:
                 # Returning [] explicitly tells Beam this function ran successfully but produced no output.
                 # If None is returned, Beam ignores it—no error, no warning.
                 # This leads to silent data loss, as those elements simply disappear from the pipeline.
-                return []
+                return
 
             image_array = np.array(Image.open(
                 io.BytesIO(image_bytes)).convert('RGB'))
@@ -104,12 +130,16 @@ class ProcessImageAndLabel(beam.DoFn):
             example = tf.train.Example(features=tf.train.Features(
                 feature=feature)).SerializeToString()
 
-            outputs.append(example)
+            # Yield TFRecord to main output
+            yield beam.pvalue.TaggedOutput('tfrecord', example)
+
+            # Yield class_name and label_id to stats output
+            yield beam.pvalue.TaggedOutput('label_stats', (class_name, label_id))
 
         except Exception as e:
             logger.error(f"Error processing {image_path}: {str(e)}")
 
-        return outputs  # Return a list instead of using yield
+        return   # Return nothing
 
 
 class ProcessDataPipeline:
@@ -136,7 +166,6 @@ class ProcessDataPipeline:
         blob = bucket.blob("processed/metadata/label_map.json")
         label_map = json.loads(blob.download_as_text())
 
-        # weekly_folder = f'weekly_{datetime.now().strftime("%Y%m%d")}'
         output_path = f'gs://{self.dataset_bucket_name}/processed/{version}/data'
         self.logger.info(f"Output path: {output_path}")
 
@@ -171,12 +200,47 @@ class ProcessDataPipeline:
         self.logger.info("Starting Apache Beam pipeline")
         with timer(self.logger, 'Apache Beam pipeline execution'):
             with beam.Pipeline(options=options) as p:
-                (p
-                 | 'GetImagePaths' >> GCSImagePathProvider(self.dataset_bucket_name, max_files, random_seed=random_seed)
-                 | 'ProcessImagesAndLabels' >> beam.ParDo(ProcessImageAndLabel(self.dataset_bucket_name, label_map))
-                 | 'WriteTFRecord' >> beam.io.tfrecordio.WriteToTFRecord(
-                     output_path,
-                     file_name_suffix='.tfrecord',
-                 ))
+                results = (
+                    p
+                    | 'GetImagePaths' >> GCSImagePathProvider(self.dataset_bucket_name, max_files, random_seed=random_seed)
+                    | 'ProcessImagesAndLabels' >> beam.ParDo(
+                        ProcessImageAndLabel(
+                            self.dataset_bucket_name, label_map)
+                    ).with_outputs('tfrecord', 'label_stats')
+                )
+
+                # TFRecord output (unchanged)
+                _ = (
+                    results.tfrecord
+                    | 'WriteTFRecord' >> beam.io.tfrecordio.WriteToTFRecord(
+                        output_path,
+                        file_name_suffix='.tfrecord',
+                    )
+                )
+
+                # NEW: Class distribution stats to BigQuery
+                (
+                    results.label_stats
+                    | 'CountByClass' >> beam.combiners.Count.PerElement()
+                    | 'FormatBQRow' >> beam.ParDo(FormatLabelStatsForBigQuery(model_version=version))
+                    | 'WriteStatsToBQ' >> beam.io.WriteToBigQuery(
+                        table=f'{self.project_id}.training_metrics.class_distribution',
+                        schema={
+                            'fields': [
+                                {'name': 'model_version',
+                                    'type': 'STRING', 'mode': 'REQUIRED'},
+                                {'name': 'class_label', 'type': 'STRING',
+                                    'mode': 'REQUIRED'},
+                                {'name': 'label_id', 'type': 'INTEGER',
+                                    'mode': 'REQUIRED'},
+                                {'name': 'example_count',
+                                    'type': 'INTEGER', 'mode': 'REQUIRED'},
+                                {'name': 'run_timestamp',
+                                    'type': 'TIMESTAMP', 'mode': 'REQUIRED'}
+                            ]
+                        },
+                        write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND
+                    )
+                )
 
         self.logger.info("Pipeline completed successfully")

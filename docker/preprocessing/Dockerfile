@@ -18,7 +18,8 @@ RUN apt-get update && apt-get install -y \
     && pip install --no-cache-dir -r requirements.txt 
 
 # Copy the run module
-COPY . /workspace/
+COPY ./df_flex/ /workspace/df_flex/
+COPY setup.py /workspace
 RUN rm -fr /workspace/__pycache__
 
 # Since we already downloaded all the dependencies, there's no need to rebuild everything.

@@ -476,7 +476,7 @@
             "sh",
             "-ec",
             "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str) -> str:\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v-\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v-\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n    return latest_model\n\n"
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str) -> str:\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n    return latest_model\n\n"
           ],
           "image": "python:3.10"
         }
@@ -607,7 +607,7 @@
               },
               "job_name": {
                 "runtimeValue": {
-                  "constant": "creature-vis-training-{{$.inputs.parameters['pipelinechannel--model_version']}}"
+                  "constant": "creature-vis-training-20250330-1215"
                 }
               },
               "launch_options": {
@@ -708,11 +708,8 @@
             "parameters": {
               "job_name": {
                 "runtimeValue": {
-                  "constant": "creature-vis-training-{{$.inputs.parameters['pipelinechannel--model_version']}}"
+                  "constant": "creature-vis-training-20250330-1215"
                 }
-              },
-              "pipelinechannel--model_version": {
-                "componentInputParameter": "model_version"
               },
               "project_id": {
                 "componentInputParameter": "project_id"

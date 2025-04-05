@@ -2,7 +2,7 @@
 FROM python:3.10-slim
 
 # Allow statements and log messages to immediately appear in the logs
-ENV PYTHONUNBUFFERED True
+ENV PYTHONUNBUFFERED=True
 
 ARG MODEL_VERSION
 ENV MODEL_VERSION=${MODEL_VERSION}
