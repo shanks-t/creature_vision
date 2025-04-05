@@ -33,6 +33,8 @@ TAR_FILE=${SERVICE}.tar  # Define the tar file for saving the image
 # Dataflow parameters
 MAXFILES ?= 500
 RANDOM_SEED ?= 42
+SERVICE_NAME ?=
+MODEL_VERSION ?=
 
 # Template variables for test-template
 GCP_PROJECT ?= $(PROJECT_ID)
@@ -79,7 +81,6 @@ build:
 	DOCKER_BUILDKIT=0 docker build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
 		--platform linux/amd64 \
 		-t ${IMAGE_TAG}
-
 
 push-image: auth-registry
 	docker tag ${APP_NAME}:${VERSION} ${IMAGE_TAG}
@@ -159,3 +160,20 @@ compile-pipeline:
 	@echo "🚀 Uploading pipeline JSON to GCS..."
 	gsutil cp creature_vision_pipeline.json gs://creature-vision-pipeline-artifacts/kubeflow-templates/
 	@echo "✅ Pipeline compilation and upload complete."
+
+deploy-run:
+	@if [ -z "$(MODEL_VERSION)" ] || [ -z "$(SERVICE_NAME)" ]; then \
+		echo "❌ Error: Both MODEL_VERSION and SERVICE_NAME must be set."; \
+		echo "Usage: make deploy-run SERVICE_NAME=<name> MODEL_VERSION=<version>"; \
+		exit 1; \
+	fi
+	@echo "🚀 Deploying Cloud Run service '$(SERVICE_NAME)' with model version '$(MODEL_VERSION)'..."
+	gcloud run deploy $(SERVICE_NAME) \
+		--image $(IMAGE_TAG) \
+		--region $(REGION) \
+		--platform managed \
+		--project $(PROJECT_ID) \
+		--allow-unauthenticated \
+		--set-env-vars MODEL_VERSION=$(MODEL_VERSION) \
+		--memory 2Gi \
+		--timeout 300
