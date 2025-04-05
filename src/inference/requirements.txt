@@ -1,8 +1,10 @@
 flask
-tensorflow
+tensorflow==2.17
 pillow
 requests
 google-cloud-storage
 google-cloud-bigquery
 numpy
 structlog
+fuzzywuzzy
+python-Levenshtein
