@@ -1,7 +1,10 @@
-import tensorflow as tf
+import re
 import os
 import json
 from collections import Counter
+from io import StringIO
+
+import tensorflow as tf
 from google.cloud import aiplatform
 
 
@@ -12,14 +15,13 @@ def setup_model(
 
     # Define metrics
     metrics = [
-        tf.keras.metrics.SparseCategoricalAccuracy(name='accuracy'),
-        tf.keras.metrics.SparseTopKCategoricalAccuracy(
-            k=5, name='top_5_accuracy'),
-        tf.keras.metrics.SparseCategoricalCrossentropy(
-            name='cross_entropy')
+        tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy"),
+        tf.keras.metrics.SparseTopKCategoricalAccuracy(k=5, name="top_5_accuracy"),
+        tf.keras.metrics.SparseCategoricalCrossentropy(name="cross_entropy"),
     ]
-    log_dir = os.getenv('AIP_TENSORBOARD_LOG_DIR',
-                        'gs://creture-vision-ml-artifacts/local')
+    log_dir = os.getenv(
+        "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local"
+    )
 
     # Create callbacks
     callbacks = [
@@ -27,13 +29,11 @@ def setup_model(
             log_dir=log_dir,
             histogram_freq=1,
             profile_batch=(50, 100),
-            update_freq='epoch'
+            update_freq="epoch",
         ),
         tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss',
-            patience=5,
-            min_delta=0.001
-        )
+            monitor="val_loss", patience=5, min_delta=0.001, restore_best_weights=True
+        ),
     ]
 
     # Freeze base layers
@@ -50,29 +50,31 @@ def run_training(
     metrics: list,
     callbacks: list,
     class_weight: dict,
-    epochs: int = 20,
-    learning_rate: float = 1e-3
+    epochs: int = 100,
+    learning_rate: float = 1e-3,
 ) -> tf.keras.Model:
     """Executes training within Vertex AI run context"""
     # Compile and train inside run context
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate),
-        loss='sparse_categorical_crossentropy',
-        metrics=metrics
+        loss="sparse_categorical_crossentropy",
+        metrics=metrics,
     )
 
-    history = model.fit(
+    model.fit(
         train_ds,
         validation_data=val_ds,
         epochs=epochs,
         callbacks=callbacks,
-        class_weight=class_weight
+        class_weight=class_weight,
     )
 
     return model
 
 
-def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.keras.Model:
+def create_model(
+    num_classes: int, input_shape: tuple = (224, 224, 3)
+) -> tf.keras.Model:
     """Creates a MobileNetV3-Small model with preprocessing, augmentation and regularization"""
     inputs = tf.keras.Input(shape=input_shape)
 
@@ -81,9 +83,7 @@ def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.ker
 
     # Create base model
     base_model = tf.keras.applications.MobileNetV3Small(
-        input_shape=input_shape,
-        include_top=False,
-        weights='imagenet'
+        input_shape=input_shape, include_top=False, weights="imagenet"
     )
 
     # Base model processing
@@ -92,8 +92,8 @@ def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.ker
 
     # Dense layers with regularization
     dense_config = {
-        'kernel_regularizer': tf.keras.regularizers.l2(0.001),
-        'activation': 'swish'
+        "kernel_regularizer": tf.keras.regularizers.l2(0.001),
+        "activation": "swish",
     }
 
     x = tf.keras.layers.Dense(256, **dense_config)(x)
@@ -106,49 +106,90 @@ def create_model(num_classes: int, input_shape: tuple = (224, 224, 3)) -> tf.ker
 
     outputs = tf.keras.layers.Dense(
         num_classes,
-        activation='softmax',
-        kernel_regularizer=tf.keras.regularizers.l2(0.01)
+        activation="softmax",
+        kernel_regularizer=tf.keras.regularizers.l2(0.01),
     )(x)
 
     return tf.keras.Model(inputs, outputs)
 
 
-def load_or_create_model(num_classes: int, prev_version) -> tf.keras.Model:
-    """Loads existing model or creates new one with dynamic class adaptation"""
+def parse_model_version(version_str: str) -> tuple:
+    """Parses version string like 'v3_1' -> (3, 1)"""
+    match = re.match(r"v(\d+)_(\d+)", version_str)
+    if not match:
+        raise ValueError(f"Invalid model version format: {version_str}")
+    return int(match.group(1)), int(match.group(2))
 
-    # Be defensive: treat "None" string or empty string as no version
-    if prev_version and prev_version != "None":
-        try:
-            model_gcs_path = f"gs://tf_models_cv/{prev_version}"
+
+def load_or_create_model(num_classes: int, prev_version: str) -> tf.keras.Model:
+    """
+    Loads an existing model or creates a new one with conditional classifier logic:
+    - If version == 'v3_0': use MobileNetV3 backbone, replace classifier
+    - If version >= 'v3_1': reuse full model (including classifier), and optionally fine-tune
+    """
+
+    def build_classifier_head(x, num_classes):
+        """Builds custom dense classifier head."""
+        dense_config = {
+            "kernel_regularizer": tf.keras.regularizers.l2(0.001),
+            "activation": "swish",
+        }
+
+        x = tf.keras.layers.Dense(256, **dense_config)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.5)(x)
+
+        x = tf.keras.layers.Dense(128, **dense_config)(x)
+        x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dropout(0.4)(x)
+
+        return tf.keras.layers.Dense(
+            num_classes,
+            activation="softmax",
+            kernel_regularizer=tf.keras.regularizers.l2(0.01),
+            name="custom_classifier",
+        )(x)
+
+    # Fallback: start from scratch if no prior version
+    if not prev_version or prev_version == "None":
+        print("No previous version provided — creating a new base model.")
+        return create_model(num_classes)
+
+    try:
+        # Parse version and load previous model
+        major, minor = parse_model_version(prev_version)
+        model_gcs_path = f"gs://tf_models_cv/{prev_version}"
+        loaded_model = tf.keras.models.load_model(model_gcs_path)
+        print(f"Loaded model from {model_gcs_path}")
+
+        if (major, minor) == (3, 0):
+            print("v3_0 detected — reusing backbone only, replacing classifier.")
+            # Use MobileNetV3 base up to global pooling layer
             base_model = tf.keras.models.load_model(model_gcs_path)
-            print(f"Loaded base model from {model_gcs_path}")
+            backbone_output = base_model.get_layer("global_average_pooling2d").output
 
-            penultimate_output = base_model.layers[-2].output
+            # Attach new classifier
+            new_output = build_classifier_head(backbone_output, num_classes)
+            model = tf.keras.Model(inputs=base_model.input, outputs=new_output)
 
-            new_output = tf.keras.layers.Dense(
-                num_classes,
-                activation='softmax',
-                kernel_regularizer=tf.keras.regularizers.l2(0.01),
-                name='dynamic_classifier'
-            )(penultimate_output)
+            # Freeze all base layers
+            for layer in base_model.layers:
+                layer.trainable = False
+            print("All base model layers frozen.")
 
-            model = tf.keras.Model(
-                inputs=base_model.input,
-                outputs=new_output,
-                name=base_model.name + "_adapted"
-            )
+        else:
+            print("Stateful retrain (v3_1 or higher) — reusing full model.")
+            model = loaded_model
 
-            for layer in model.layers[:-1]:
-                layer.set_weights(base_model.get_layer(
-                    layer.name).get_weights())
+            # Optionally: unfreeze last N layers for fine-tuning
+            unfreeze_count = 20
+            for layer in model.layers[-unfreeze_count:]:
+                layer.trainable = True
+            print(f"Unfroze last {unfreeze_count} layers for fine-tuning.")
 
-        except Exception as e:
-            print(f"Error adapting model: {str(e)}")
-            print(f"Falling back to creating a new base model...")
-            model = create_model(num_classes)
-
-    else:
-        print("No previous model version provided. Creating new base model...")
+    except Exception as e:
+        print(f"Error loading or adapting model: {e}")
+        print("Falling back to creating a new model.")
         model = create_model(num_classes)
 
     return model
@@ -182,8 +223,8 @@ def compute_class_weight(dataset, label_map):
 
     # Compute weights inversely proportional to class frequency
     weights = {
-        class_id: total_samples /
-        (len(all_classes) * counter.get(class_id, 1))  # Default 1 if missing
+        class_id: total_samples
+        / (len(all_classes) * counter.get(class_id, 1))  # Default 1 if missing
         for class_id in all_classes
     }
 
@@ -195,31 +236,36 @@ def compute_class_weight(dataset, label_map):
     return weights
 
 
-def save_model(model: tf.keras.Model, version: str, bucket_name: str, class_names: list) -> None:
+def save_model(
+    model: tf.keras.Model,
+    version: str,
+    bucket_name: str,
+) -> None:
     """
-    Saves the trained model in the Keras (.keras) format along with a metadata JSON file.
+    Saves the trained model in the Keras (.keras) format and its model summary as a .txt file.
 
-    Both artifacts are stored in a versioned folder in GCS.
+    Artifacts are stored in a versioned folder in GCS.
 
     Args:
         model: The tf.keras.Model to be saved.
         version: Version identifier used as the folder name.
         bucket_name: The target GCS bucket name.
-        class_names: List of class names to be saved as metadata.
     """
-    # Create a folder path for this version of the model.
+    # GCS paths
     model_dir = f"gs://{bucket_name}/{version}"
     model_path = f"{model_dir}/{version}.keras"
+    summary_path = f"{model_dir}/{version}_summary.txt"
 
-    # Save the model in the native Keras format.
+    # === Save Model ===
     print(f"Saving model to {model_path}")
     tf.keras.models.save_model(model, model_path, include_optimizer=True)
 
-    # Create metadata and save it as a .json file.
-    metadata = {"class_names": class_names}
-    metadata_path = f"{model_dir}/metadata.json"
-    print(f"Saving metadata to {metadata_path}")
+    # === Capture Model Summary ===
+    stream = StringIO()
+    model.summary(print_fn=lambda x: stream.write(x + "\n"))
+    summary_text = stream.getvalue()
+    stream.close()
 
-    # Use tf.io.gfile, which supports gs:// URIs, to write the JSON file.
-    with tf.io.gfile.GFile(metadata_path, "w") as f:
-        json.dump(metadata, f)
+    print(f"Saving model summary to {summary_path}")
+    with tf.io.gfile.GFile(summary_path, "w") as f:
+        f.write(summary_text)
