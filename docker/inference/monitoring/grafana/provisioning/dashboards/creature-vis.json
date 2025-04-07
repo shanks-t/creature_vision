@@ -57,8 +57,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -147,8 +146,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -161,7 +159,7 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 12,
+                "w": 6,
                 "x": 12,
                 "y": 0
             },
@@ -221,6 +219,93 @@
         },
         {
             "datasource": {
+                "default": true,
+                "type": "grafana-bigquery-datasource",
+                "uid": "P0871A590F805E5CD"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green"
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 6,
+                "x": 18,
+                "y": 0
+            },
+            "id": 10,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "percentChangeColorMode": "standard",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "showPercentChange": false,
+                "textMode": "auto",
+                "wideLayout": true
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "grafana-bigquery-datasource",
+                        "uid": "P0871A590F805E5CD"
+                    },
+                    "editorMode": "code",
+                    "format": 1,
+                    "location": "",
+                    "project": "creature-vision",
+                    "rawQuery": true,
+                    "rawSql": "SELECT\n  AVG(CAST(is_correct AS INT64)) AS avg_prediction_accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\nWHERE model_version = '${model_version_B}'",
+                    "refId": "A",
+                    "sql": {
+                        "columns": [
+                            {
+                                "parameters": [],
+                                "type": "function"
+                            }
+                        ],
+                        "groupBy": [
+                            {
+                                "property": {
+                                    "type": "string"
+                                },
+                                "type": "groupBy"
+                            }
+                        ],
+                        "limit": 50
+                    }
+                }
+            ],
+            "title": "Lifetime Prediction Accuracy - ${model_version_B}",
+            "type": "stat"
+        },
+        {
+            "datasource": {
                 "type": "grafana-bigquery-datasource",
                 "uid": "P0871A590F805E5CD"
             },
@@ -255,8 +340,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -368,8 +452,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -481,8 +564,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -520,7 +602,7 @@
                     "mode": "single",
                     "sort": "none"
                 },
-                "xTickLabelRotation": 0,
+                "xTickLabelRotation": -30,
                 "xTickLabelSpacing": 0
             },
             "pluginVersion": "11.5.2",
@@ -611,8 +693,7 @@
                         "mode": "percentage",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "orange",
@@ -718,8 +799,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             }
                         ]
                     }
@@ -824,8 +904,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             }
                         ]
                     }
@@ -906,10 +985,12 @@
                 "allowCustomValue": false,
                 "current": {
                     "text": [
-                        "v3.0"
+                        "v3_0",
+                        "v3_1"
                     ],
                     "value": [
-                        "v3.0"
+                        "v3_0",
+                        "v3_1"
                     ]
                 },
                 "datasource": {
@@ -955,10 +1036,12 @@
                 "allowCustomValue": false,
                 "current": {
                     "text": [
-                        "affenpinscher"
+                        "buhund norwegian",
+                        "danish swedish farmdog"
                     ],
                     "value": [
-                        "affenpinscher"
+                        "buhund norwegian",
+                        "danish swedish farmdog"
                     ]
                 },
                 "definition": "",
@@ -1001,8 +1084,8 @@
             {
                 "allowCustomValue": false,
                 "current": {
-                    "text": "v3.0",
-                    "value": "v3.0"
+                    "text": "v3_0",
+                    "value": "v3_0"
                 },
                 "definition": "",
                 "name": "model_version_A",
@@ -1040,8 +1123,8 @@
             {
                 "allowCustomValue": false,
                 "current": {
-                    "text": "v-20250323",
-                    "value": "v-20250323"
+                    "text": "v3_1",
+                    "value": "v3_1"
                 },
                 "definition": "",
                 "name": "model_version_B",
@@ -1079,13 +1162,13 @@
         ]
     },
     "time": {
-        "from": "2025-03-29T05:02:06.198Z",
-        "to": "2025-03-29T17:50:10.356Z"
+        "from": "2025-03-28T22:38:04.000Z",
+        "to": "2025-03-29T11:26:08.000Z"
     },
     "timepicker": {},
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 71,
+    "version": 76,
     "weekStart": ""
 }

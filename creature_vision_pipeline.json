@@ -341,23 +341,6 @@
         }
       }
     },
-    "comp-get-previous-model": {
-      "executorLabel": "exec-get-previous-model",
-      "inputDefinitions": {
-        "parameters": {
-          "bucket_name": {
-            "parameterType": "STRING"
-          }
-        }
-      },
-      "outputDefinitions": {
-        "parameters": {
-          "Output": {
-            "parameterType": "STRING"
-          }
-        }
-      }
-    },
     "comp-wait-for-dataflow-job": {
       "executorLabel": "exec-wait-for-dataflow-job",
       "inputDefinitions": {
@@ -461,26 +444,6 @@
           "image": "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
         }
       },
-      "exec-get-previous-model": {
-        "container": {
-          "args": [
-            "--executor_input",
-            "{{$}}",
-            "--function_to_execute",
-            "get_previous_model"
-          ],
-          "command": [
-            "sh",
-            "-c",
-            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'kfp==2.10.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-storage' && \"$0\" \"$@\"\n",
-            "sh",
-            "-ec",
-            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef get_previous_model(bucket_name: str) -> str:\n    from google.cloud import storage\n    client = storage.Client()\n    bucket = client.bucket(bucket_name)\n    blobs = list(bucket.list_blobs(prefix=\"v\"))\n\n    model_versions = sorted(\n        [blob.name for blob in blobs if \"v\" in blob.name],\n        reverse=True\n    )\n\n    latest_model = model_versions[0] if model_versions else \"None\"\n    return latest_model\n\n"
-          ],
-          "image": "python:3.10"
-        }
-      },
       "exec-wait-for-dataflow-job": {
         "container": {
           "args": [
@@ -496,7 +459,7 @@
             "sh",
             "-ec",
             "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
-            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef wait_for_dataflow_job(project_id: str, region: str, job_name: str, poll_interval: int = 30, timeout: int = 1800):\n    from googleapiclient.discovery import build\n    import time\n\n    dataflow = build('dataflow', 'v1b3')\n    elapsed_time = 0\n    job_id = None\n\n    request = dataflow.projects().locations().jobs().list(\n        projectId=project_id, location=region)\n    while request is not None:\n        response = request.execute()\n        for job in response.get('jobs', []):\n            if job['name'] == job_name:\n                job_id = job['id']\n                break\n        request = dataflow.projects().locations().jobs().list_next(\n            previous_request=request, previous_response=response)\n        if job_id:\n            break\n\n    if not job_id:\n        raise ValueError(f\"No job found with name {job_name}\")\n\n    while elapsed_time < timeout:\n        job = dataflow.projects().locations().jobs().get(\n            projectId=project_id,\n            location=region,\n            jobId=job_id\n        ).execute()\n\n        state = job.get('currentState', 'UNKNOWN')\n        print(f\"Dataflow job {job_id} is in state: {state}\")\n\n        if state == 'JOB_STATE_DONE':\n            print(f\"Dataflow job {job_id} completed successfully.\")\n            return\n        elif state in ['JOB_STATE_FAILED', 'JOB_STATE_CANCELLED']:\n            raise RuntimeError(\n                f\"Dataflow job {job_id} failed with state: {state}\")\n\n        time.sleep(poll_interval)\n        elapsed_time += poll_interval\n\n    raise TimeoutError(\n        f\"Dataflow job {job_id} did not complete within the allotted time of {timeout} seconds.\")\n\n"
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef wait_for_dataflow_job(\n    project_id: str,\n    region: str,\n    job_name: str,\n    poll_interval: int = 30,\n    timeout: int = 1800,\n):\n    from googleapiclient.discovery import build\n    import time\n\n    dataflow = build(\"dataflow\", \"v1b3\")\n    elapsed_time = 0\n    job_id = None\n\n    request = (\n        dataflow.projects()\n        .locations()\n        .jobs()\n        .list(projectId=project_id, location=region)\n    )\n    while request is not None:\n        response = request.execute()\n        for job in response.get(\"jobs\", []):\n            if job[\"name\"] == job_name:\n                job_id = job[\"id\"]\n                break\n        request = (\n            dataflow.projects()\n            .locations()\n            .jobs()\n            .list_next(previous_request=request, previous_response=response)\n        )\n        if job_id:\n            break\n\n    if not job_id:\n        raise ValueError(f\"No job found with name {job_name}\")\n\n    while elapsed_time < timeout:\n        job = (\n            dataflow.projects()\n            .locations()\n            .jobs()\n            .get(projectId=project_id, location=region, jobId=job_id)\n            .execute()\n        )\n\n        state = job.get(\"currentState\", \"UNKNOWN\")\n        print(f\"Dataflow job {job_id} is in state: {state}\")\n\n        if state == \"JOB_STATE_DONE\":\n            print(f\"Dataflow job {job_id} completed successfully.\")\n            return\n        elif state in [\"JOB_STATE_FAILED\", \"JOB_STATE_CANCELLED\"]:\n            raise RuntimeError(f\"Dataflow job {job_id} failed with state: {state}\")\n\n        time.sleep(poll_interval)\n        elapsed_time += poll_interval\n\n    raise TimeoutError(\n        f\"Dataflow job {job_id} did not complete within the allotted time of {timeout} seconds.\"\n    )\n\n"
           ],
           "image": "python:3.10"
         }
@@ -518,7 +481,6 @@
             "name": "comp-custom-training-job"
           },
           "dependentTasks": [
-            "get-previous-model",
             "wait-for-dataflow-job"
           ],
           "inputs": {
@@ -536,17 +498,14 @@
               "location": {
                 "componentInputParameter": "region"
               },
-              "pipelinechannel--get-previous-model-Output": {
-                "taskOutputParameter": {
-                  "outputParameterKey": "Output",
-                  "producerTask": "get-previous-model"
-                }
-              },
               "pipelinechannel--model_version": {
                 "componentInputParameter": "model_version"
               },
               "pipelinechannel--pipeline_root": {
                 "componentInputParameter": "pipeline_root"
+              },
+              "pipelinechannel--previous_model_version": {
+                "componentInputParameter": "previous_model_version"
               },
               "pipelinechannel--python_package_gcs_uri": {
                 "componentInputParameter": "python_package_gcs_uri"
@@ -574,7 +533,7 @@
                           "--version",
                           "{{$.inputs.parameters['pipelinechannel--model_version']}}",
                           "--previous_model_version",
-                          "{{$.inputs.parameters['pipelinechannel--get-previous-model-Output']}}"
+                          "{{$.inputs.parameters['pipelinechannel--previous_model_version']}}"
                         ],
                         "executor_image_uri": "us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-17.py310:latest",
                         "package_uris": [
@@ -607,7 +566,7 @@
               },
               "job_name": {
                 "runtimeValue": {
-                  "constant": "creature-vis-training-20250330-1215"
+                  "constant": "creature-vis-training-20250406-1928"
                 }
               },
               "launch_options": {
@@ -659,7 +618,7 @@
                 "componentInputParameter": "inference_image"
               },
               "model_version": {
-                "componentInputParameter": "model_version"
+                "componentInputParameter": "model_to_update"
               },
               "project_id": {
                 "componentInputParameter": "project_id"
@@ -668,30 +627,12 @@
                 "componentInputParameter": "region"
               },
               "service_name": {
-                "componentInputParameter": "inference_service"
+                "componentInputParameter": "service_to_update"
               }
             }
           },
           "taskInfo": {
             "name": "deploy-cloud-run-inference-service"
-          }
-        },
-        "get-previous-model": {
-          "cachingOptions": {
-            "enableCache": true
-          },
-          "componentRef": {
-            "name": "comp-get-previous-model"
-          },
-          "inputs": {
-            "parameters": {
-              "bucket_name": {
-                "componentInputParameter": "model_bucket"
-              }
-            }
-          },
-          "taskInfo": {
-            "name": "get-previous-model"
           }
         },
         "wait-for-dataflow-job": {
@@ -708,7 +649,7 @@
             "parameters": {
               "job_name": {
                 "runtimeValue": {
-                  "constant": "creature-vis-training-20250330-1215"
+                  "constant": "creature-vis-training-20250406-1928"
                 }
               },
               "project_id": {
@@ -733,21 +674,21 @@
         "inference_image": {
           "parameterType": "STRING"
         },
-        "inference_service": {
-          "parameterType": "STRING"
-        },
         "max_files": {
           "defaultValue": "1000",
           "isOptional": true,
           "parameterType": "STRING"
         },
-        "model_bucket": {
+        "model_to_update": {
           "parameterType": "STRING"
         },
         "model_version": {
           "parameterType": "STRING"
         },
         "pipeline_root": {
+          "parameterType": "STRING"
+        },
+        "previous_model_version": {
           "parameterType": "STRING"
         },
         "project_id": {
@@ -760,6 +701,9 @@
           "parameterType": "STRING"
         },
         "service_account": {
+          "parameterType": "STRING"
+        },
+        "service_to_update": {
           "parameterType": "STRING"
         }
       }
