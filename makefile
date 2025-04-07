@@ -126,7 +126,7 @@ test-train: cp-train-pkg
 	  --region=us-east1 \
 	  --display-name=creture-vision-training \
 	  --python-package-uris=gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz \
-	  --args=--version=v-20250323 \
+	  --args=--version=v-3_2 \
 	  --worker-pool-spec=machine-type=e2-standard-4,replica-count=1,executor-image-uri=us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-17.py310:latest,python-module=creature_vision_training.main \
 	  --service-account=kubeflow-pipeline-sa@creature-vision.iam.gserviceaccount.com
 
@@ -150,7 +150,7 @@ test-pipeline-cf:
 deploy-pipeline-cf: compile-pipeline
 	cd src/trigger && \
 	gcloud functions deploy trigger-creature-pipeline \
-	--runtime=python310 --entry-point=trigger_pipeline \
+	--runtime=python310 --entry-point=run_pipeline_trigger \
 	--trigger-http --region=us-east1 --memory=512MB \
 	--source=. --allow-unauthenticated
 
