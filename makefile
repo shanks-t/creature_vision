@@ -35,6 +35,7 @@ MAXFILES ?= 500
 RANDOM_SEED ?= 42
 SERVICE_NAME ?=
 MODEL_VERSION ?=
+USE_CACHE ?=
 
 # Template variables for test-template
 GCP_PROJECT ?= $(PROJECT_ID)
@@ -137,15 +138,19 @@ cp-train-pkg:
 	gsutil cp dist/*.tar.gz gs://creture-vision-ml-artifacts/python_packages/
 
 check-pkg:
-	gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -tzf -
+	 gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -tzf -
 
+inspect-pkg:
+	gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -xOzf - \
+	creature_vision_training-0.1/creature_vision/model.py
 test-run-inf:
 	curl -X GET https://dog-predictor-284159624099.us-east1.run.app/predict/
 
 test-pipeline-cf:
 	curl -X POST https://us-east1-creature-vision.cloudfunctions.net/trigger-creature-pipeline \
 	-H "Content-Type: application/json" \
-	-d '{"max_files": "$(MAX_FILES)"}'
+	-d '{"max_files": "$(MAX_FILES)", "use_caching": "${USE_CACHE}"}'
+
 
 deploy-pipeline-cf: compile-pipeline
 	cd src/trigger && \
@@ -177,3 +182,17 @@ deploy-run:
 		--set-env-vars MODEL_VERSION=$(MODEL_VERSION) \
 		--memory 2Gi \
 		--timeout 300
+
+reset-challenger:
+	printf '%s\n' '{' \
+	'  "champion": {' \
+	'    "model_version": "v3_0",' \
+	'    "deployed_at": "2025-04-05T00:00:00Z"' \
+	'  },' \
+	'  "challenger": {' \
+	'    "model_version": "v3_0",' \
+	'    "deployed_at": "2025-04-05T00:00:00Z"' \
+	'  }' \
+	'}' > model_versions.json && \
+	gsutil cp model_versions.json gs://ml_challenger_state/model_versions.json
+
