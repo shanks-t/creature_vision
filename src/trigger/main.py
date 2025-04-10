@@ -96,6 +96,7 @@ def trigger_pipeline(
     new_model_version,
     previous_model_version,
     max_files,
+    use_caching,
 ):
     aiplatform.init(project=PROJECT_ID, location=REGION, staging_bucket=PIPELINE_ROOT)
 
@@ -113,11 +114,10 @@ def trigger_pipeline(
             "gcs_template_path": GCS_TEMPLATE_PATH,
             "model_version": new_model_version,
             "previous_model_version": previous_model_version,
-            "model_to_update": model_to_update,
             "service_to_update": service_to_update,
             "max_files": max_files,
         },
-        enable_caching=False,
+        enable_caching=use_caching,
     )
     job.submit(service_account=SERVICE_ACCOUNT)
     return job
@@ -126,15 +126,20 @@ def trigger_pipeline(
 def run_pipeline_trigger(request):
     print("Triggered pipeline orchestration via Cloud Function.")
 
+    max_files = "1200"
+    use_caching = False  # default
+
     if request.method == "POST":
         try:
             request_json = request.get_json(silent=True)
-            if request_json and "max_files" in request_json:
-                max_files = str(request_json["max_files"])
-        except Exception:
-            pass
+            if request_json:
+                max_files = str(request_json.get("max_files", max_files))
+                use_caching = bool(request_json.get("use_caching", use_caching))
+        except Exception as e:
+            print(f"Error parsing request: {e}")
     elif request.method == "GET":
         max_files = request.args.get("max_files", "1200")
+        use_caching = request.args.get("use_caching", "false").lower() == "true"
 
     # Step 1: Load model versions
     data, blob = load_model_versions()
@@ -156,13 +161,16 @@ def run_pipeline_trigger(request):
         new_model_version=new_model_version,
         previous_model_version=model_to_update,
         max_files=max_files,
+        use_caching=use_caching,
     )
 
     return {
         "message": "Pipeline job submitted successfully",
         "job_name": job.display_name,
-        "model_version": new_model_version,
+        "prev_model_version": model_to_update,
+        "new_model_version": new_model_version,
         "state": job.state.name,
         "max_files": max_files,
+        "caching_enabled": use_caching,
         "pipeline_url": f"https://console.cloud.google.com/vertex-ai/locations/{REGION}/pipelines/runs/{job.resource_name.split('/')[-1]}?project={PROJECT_ID}",
     }, 200

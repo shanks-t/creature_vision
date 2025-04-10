@@ -10,6 +10,7 @@ from google.cloud import aiplatform
 
 def setup_model(
     model: tf.keras.Model,
+    base_learning_rate: float = 1e-3,
 ) -> tuple[tf.keras.Model, list, list]:
     """Configures model and Vertex AI experiment without starting run"""
 
@@ -23,7 +24,13 @@ def setup_model(
         "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local"
     )
 
-    # Create callbacks
+    # Learning rate schedule (optional)
+    def lr_schedule(epoch, lr):
+        if epoch > 10:
+            return lr * 0.5
+        return lr
+
+    # Callbacks
     callbacks = [
         tf.keras.callbacks.TensorBoard(
             log_dir=log_dir,
@@ -34,11 +41,11 @@ def setup_model(
         tf.keras.callbacks.EarlyStopping(
             monitor="val_loss", patience=5, min_delta=0.001, restore_best_weights=True
         ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor="val_loss", factor=0.5, patience=3, verbose=1
+        ),
+        tf.keras.callbacks.LearningRateScheduler(lr_schedule, verbose=1),
     ]
-
-    # Freeze base layers
-    for layer in model.layers[:-3]:
-        layer.trainable = False
 
     return model, metrics, callbacks
 
@@ -67,6 +74,7 @@ def run_training(
         epochs=epochs,
         callbacks=callbacks,
         class_weight=class_weight,
+        verbose=2,
     )
 
     return model
@@ -121,12 +129,14 @@ def parse_model_version(version_str: str) -> tuple:
     return int(match.group(1)), int(match.group(2))
 
 
-def load_or_create_model(num_classes: int, prev_version: str) -> tf.keras.Model:
+def load_or_create_model(label_map: dict, prev_version: str) -> tf.keras.Model:
     """
     Loads an existing model or creates a new one with conditional classifier logic:
     - If version == 'v3_0': use MobileNetV3 backbone, replace classifier
     - If version >= 'v3_1': reuse full model (including classifier), and optionally fine-tune
     """
+    num_classes = len(label_map)
+    print(f"number of classes: {num_classes}")
 
     def build_classifier_head(x, num_classes):
         """Builds custom dense classifier head."""
@@ -231,7 +241,7 @@ def compute_class_weight(dataset, label_map):
     # Normalize weights to prevent extreme values
     max_weight = max(weights.values())
     weights = {k: v / max_weight for k, v in weights.items()}  # Normalize
-    print(f"class weights {weights}")
+    # print(f"class weights {weights}")
 
     return weights
 
