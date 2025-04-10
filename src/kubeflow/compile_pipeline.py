@@ -118,7 +118,6 @@ def creature_vision_pipeline(
     gcs_template_path: str,
     model_version: str,
     previous_model_version: str,
-    new_model_version: str,
     service_to_update: str,
     max_files: str = "1000",
 ):
@@ -169,7 +168,7 @@ def creature_vision_pipeline(
         region=region,
         service_name=service_to_update,
         image_uri=inference_image,
-        model_version=new_model_version,
+        model_version=model_version,
     ).after(training_task)
 
 
