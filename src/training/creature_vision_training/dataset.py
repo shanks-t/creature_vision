@@ -58,7 +58,7 @@ def create_training_dataset(
     Creates training and validation datasets from a single TFRecord file in GCS.
     """
     # Get full GCS path
-    tfrecord_pattern = f"gs://{bucket_name}/{tfrecord_path}/**/*.tfrecord"
+    tfrecord_pattern = f"gs://{bucket_name}/{tfrecord_path}/*.tfrecord"
 
     # Verify TFRecord exists
     if not tf.io.gfile.glob(tfrecord_pattern):

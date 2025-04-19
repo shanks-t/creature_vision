@@ -84,14 +84,13 @@ def update_model_versions(blob, data, winner: str, model_version: str):
         }
         blob.upload_from_string(json.dumps(data, indent=2))
         return (
-            data["champion"]["model_version"],
+            current_version,
             "challenger-service",
             new_challenger_version,
         )
 
 
 def trigger_pipeline(
-    model_to_update,
     service_to_update,
     new_model_version,
     previous_model_version,
@@ -148,18 +147,18 @@ def run_pipeline_trigger(request):
 
     # Step 2: Evaluate accuracy
     winner = evaluate_models(champion, challenger)
+    print(f"winner: {winner}")
 
     # Step 3: Decide next model versions and services
-    model_to_update, service_to_update, new_model_version = update_model_versions(
+    current_version, service_to_update, new_model_version = update_model_versions(
         blob, data, winner, challenger
     )
 
     # Step 4: Trigger pipeline with resolved values
     job = trigger_pipeline(
-        model_to_update=model_to_update,
         service_to_update=service_to_update,
         new_model_version=new_model_version,
-        previous_model_version=model_to_update,
+        previous_model_version=current_version,
         max_files=max_files,
         use_caching=use_caching,
     )
@@ -167,7 +166,7 @@ def run_pipeline_trigger(request):
     return {
         "message": "Pipeline job submitted successfully",
         "job_name": job.display_name,
-        "prev_model_version": model_to_update,
+        "prev_model_version": current_version,
         "new_model_version": new_model_version,
         "state": job.state.name,
         "max_files": max_files,

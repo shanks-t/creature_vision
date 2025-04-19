@@ -138,11 +138,12 @@ cp-train-pkg:
 	gsutil cp dist/*.tar.gz gs://creture-vision-ml-artifacts/python_packages/
 
 check-pkg:
-	 gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -tzf -
+	 gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -tzf - 
 
 inspect-pkg:
 	gsutil cp gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz - | tar -xOzf - \
-	creature_vision_training-0.1/creature_vision/model.py
+	creature_vision_training-0.1/creature_vision_training/model.py
+	
 test-run-inf:
 	curl -X GET https://dog-predictor-284159624099.us-east1.run.app/predict/
 

@@ -132,33 +132,11 @@ def parse_model_version(version_str: str) -> tuple:
 def load_or_create_model(label_map: dict, prev_version: str) -> tf.keras.Model:
     """
     Loads an existing model or creates a new one with conditional classifier logic:
-    - If version == 'v3_0': use MobileNetV3 backbone, replace classifier
-    - If version >= 'v3_1': reuse full model (including classifier), and optionally fine-tune
+    - If version == 'v3_0': recreate MobileNetV3 backbone from scratch and attach new classifier
+    - If version >= 'v3_1': load full model from GCS and optionally unfreeze last N layers
     """
     num_classes = len(label_map)
     print(f"number of classes: {num_classes}")
-
-    def build_classifier_head(x, num_classes):
-        """Builds custom dense classifier head."""
-        dense_config = {
-            "kernel_regularizer": tf.keras.regularizers.l2(0.001),
-            "activation": "swish",
-        }
-
-        x = tf.keras.layers.Dense(256, **dense_config)(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dropout(0.5)(x)
-
-        x = tf.keras.layers.Dense(128, **dense_config)(x)
-        x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dropout(0.4)(x)
-
-        return tf.keras.layers.Dense(
-            num_classes,
-            activation="softmax",
-            kernel_regularizer=tf.keras.regularizers.l2(0.01),
-            name="custom_classifier",
-        )(x)
 
     # Fallback: start from scratch if no prior version
     if not prev_version or prev_version == "None":
@@ -166,30 +144,20 @@ def load_or_create_model(label_map: dict, prev_version: str) -> tf.keras.Model:
         return create_model(num_classes)
 
     try:
-        # Parse version and load previous model
+        # Parse version string
         major, minor = parse_model_version(prev_version)
-        model_gcs_path = f"gs://tf_models_cv/{prev_version}"
-        loaded_model = tf.keras.models.load_model(model_gcs_path)
-        print(f"Loaded model from {model_gcs_path}")
 
         if (major, minor) == (3, 0):
-            print("v3_0 detected — reusing backbone only, replacing classifier.")
-            # Use MobileNetV3 base up to global pooling layer
-            base_model = tf.keras.models.load_model(model_gcs_path)
-            backbone_output = base_model.get_layer("global_average_pooling2d").output
-
-            # Attach new classifier
-            new_output = build_classifier_head(backbone_output, num_classes)
-            model = tf.keras.Model(inputs=base_model.input, outputs=new_output)
-
-            # Freeze all base layers
-            for layer in base_model.layers:
-                layer.trainable = False
-            print("All base model layers frozen.")
+            print("v3_0 detected — creating a new base model.")
+            # Directly call `create_model` instead of manually loading or building the model
+            model = create_model(num_classes)
+            print("Model created with MobileNetV3 backbone and custom classifier.")
 
         else:
-            print("Stateful retrain (v3_1 or higher) — reusing full model.")
-            model = loaded_model
+            print("Stateful retrain (v3_1 or higher) — loading full model.")
+            model_gcs_path = f"gs://tf_models_cv/{prev_version}/{prev_version}.keras"
+            model = tf.keras.models.load_model(model_gcs_path)
+            print(f"Loaded model from {model_gcs_path}")
 
             # Optionally: unfreeze last N layers for fine-tuning
             unfreeze_count = 20
