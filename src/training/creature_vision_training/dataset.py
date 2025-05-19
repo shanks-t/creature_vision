@@ -1,6 +1,8 @@
-import tensorflow as tf
-from typing import Tuple
+from typing import Tuple, Any
 import json
+import random
+
+import tensorflow as tf
 
 
 def parse_tfrecord_fn(example_proto):
@@ -52,39 +54,62 @@ def create_training_dataset(
     tfrecord_path: str,
     labels_path: str,
     batch_size: int,
+    model_version: str,
+    sample_pct_other_versions: float = 0.2,
     validation_split: float = 0.2,
-) -> Tuple[tf.data.Dataset, tf.data.Dataset, int, list]:
+) -> Tuple[tf.data.Dataset, tf.data.Dataset, Any]:
     """
-    Creates training and validation datasets from a single TFRecord file in GCS.
+    Creates training and validation datasets that includes all TFRecords for the
+    given model_version and a percentage of TFRecords from other versions.
     """
-    # Get full GCS path
-    tfrecord_pattern = f"gs://{bucket_name}/{tfrecord_path}/*.tfrecord"
+    # Get all TFRecord files
+    all_tfrecords = tf.io.gfile.glob(
+        f"gs://{bucket_name}/{tfrecord_path}/**/*.tfrecord"
+    )
 
-    # Verify TFRecord exists
-    if not tf.io.gfile.glob(tfrecord_pattern):
-        raise FileNotFoundError(f"No TFRecord files found at {tfrecord_pattern}")
+    if not all_tfrecords:
+        raise FileNotFoundError(f"No TFRecord files found at {tfrecord_path}")
 
-    # Create dataset from TFRecords
-    dataset = tf.data.TFRecordDataset(tf.io.gfile.glob(tfrecord_pattern))
+    # Separate current and previous model version TFRecords
+    current_version_records = [
+        f
+        for f in all_tfrecords
+        if f"{model_version}_" in f or f"/{model_version}/" in f
+    ]
+    previous_version_records = [
+        f for f in all_tfrecords if f not in current_version_records
+    ]
 
-    # Count records before parsing
+    if not current_version_records:
+        raise ValueError(f"No TFRecords found for model version: {model_version}")
+
+    # Sample percentage of previous version records
+    sampled_previous_records = random.sample(
+        previous_version_records,
+        int(len(previous_version_records) * sample_pct_other_versions),
+    )
+
+    print(
+        f"Using {len(current_version_records)} current + {len(sampled_previous_records)} previous TFRecords"
+    )
+
+    # Combine datasets
+    files_to_load = current_version_records + sampled_previous_records
+    dataset = tf.data.TFRecordDataset(files_to_load)
+
+    # Count examples
     dataset_size = sum(1 for _ in dataset)
     if dataset_size == 0:
-        raise ValueError("TFRecord dataset is empty")
+        raise ValueError("Combined TFRecord dataset is empty")
 
-    print(f"Found {dataset_size} records in TFRecord file")
-
-    # Calculate split sizes
+    # Parse and split dataset
+    dataset = dataset.map(parse_tfrecord_fn, num_parallel_calls=tf.data.AUTOTUNE)
     val_size = int(dataset_size * validation_split)
 
-    # Parse TFRecords
-    dataset = dataset.map(parse_tfrecord_fn, num_parallel_calls=tf.data.AUTOTUNE)
-
-    # Split the dataset
     train_ds = dataset.skip(val_size)
     val_ds = dataset.take(val_size)
 
-    # Read class names from metadata file
+    # Label map loading
     label_map_path = f"gs://{bucket_name}/{labels_path}/label_map.json"
     try:
         with tf.io.gfile.GFile(label_map_path, "r") as f:
@@ -92,13 +117,11 @@ def create_training_dataset(
     except Exception as e:
         raise ValueError(f"Failed to read label map from {label_map_path}: {str(e)}")
 
-    # Apply augmentation to train dataset only
+    # Augmentation and batching
     augment_fn = get_augmentation_fn()
     train_ds = train_ds.map(augment_fn, num_parallel_calls=tf.data.AUTOTUNE)
-
-    # Optimize datasets for training
     train_ds = (
-        train_ds.shuffle(dataset.cardinality())
+        train_ds.shuffle(buffer_size=dataset_size)
         .batch(batch_size)
         .prefetch(tf.data.AUTOTUNE)
     )
