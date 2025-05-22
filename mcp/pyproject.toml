@@ -1,0 +1,10 @@
+[project]
+name = "mcp-intro"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "google-cloud-bigquery>=3.31.0",
+    "mcp[cli, sever]>=1.6.0",
+]
