@@ -35,6 +35,7 @@ MAXFILES ?= 500
 RANDOM_SEED ?= 42
 SERVICE_NAME ?=
 MODEL_VERSION ?=
+PREVIOUS_VERSION ?=
 USE_CACHE ?=
 
 # Template variables for test-template
@@ -101,7 +102,11 @@ run-dataflow:
 	--parameters=max_files=$(MAXFILES)
 
 run-monitoring:
-	docker compose -f docker-compose.grafana.yaml up
+	docker compose -f docker/inference/docker-compose.grafana.yaml up --build
+
+run-training:
+	PYTHONPATH=src/training python -m creature_vision_training.main --version=$(MODEL_VERSION) --previous_model_version=$(PREVIOUS_VERSION)
+
 
 test-template: ## Test the Integrity of the Flex Container
 	@gcloud config set project ${GCP_PROJECT}
