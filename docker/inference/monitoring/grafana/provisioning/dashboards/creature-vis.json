@@ -23,116 +23,6 @@
     "panels": [
         {
             "datasource": {
-                "type": "grafana-bigquery-datasource",
-                "uid": "P0871A590F805E5CD"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "axisBorderShow": false,
-                        "axisCenteredZero": false,
-                        "axisColorMode": "text",
-                        "axisLabel": "Num Predictions",
-                        "axisPlacement": "left",
-                        "fillOpacity": 80,
-                        "gradientMode": "none",
-                        "hideFrom": {
-                            "legend": false,
-                            "tooltip": false,
-                            "viz": false
-                        },
-                        "lineWidth": 1,
-                        "scaleDistribution": {
-                            "type": "linear"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
-                    },
-                    "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            },
-                            {
-                                "color": "red",
-                                "value": 80
-                            }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 0
-            },
-            "id": 7,
-            "options": {
-                "barRadius": 0.2,
-                "barWidth": 0.83,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                    "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom",
-                    "showLegend": true
-                },
-                "orientation": "auto",
-                "showValue": "auto",
-                "stacking": "normal",
-                "tooltip": {
-                    "hideZeros": false,
-                    "mode": "multi",
-                    "sort": "desc"
-                },
-                "xField": "model_version",
-                "xTickLabelRotation": -45,
-                "xTickLabelSpacing": 0
-            },
-            "pluginVersion": "11.5.2",
-            "targets": [
-                {
-                    "editorMode": "code",
-                    "format": 1,
-                    "location": "",
-                    "project": "creature-vision",
-                    "rawQuery": true,
-                    "rawSql": "WITH correct_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_correct\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = true\n  GROUP BY model_version, actual\n),\nincorrect_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_incorrect\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = false\n  GROUP BY model_version, actual\n),\nmodel_summary AS (\n  SELECT\n    COALESCE(cp.model_version, ip.model_version) AS model_version,\n    COALESCE(cp.actual, ip.actual) AS actual,\n    SUM(IFNULL(cp.num_correct, 0)) AS total_correct_predictions,\n    SUM(IFNULL(ip.num_incorrect, 0)) AS total_incorrect_predictions\n  FROM correct_preds cp\n  FULL OUTER JOIN incorrect_preds ip\n    ON cp.model_version = ip.model_version AND cp.actual = ip.actual\n  GROUP BY model_version, actual\n)\nSELECT *,\nFROM model_summary\nWHERE actual IN (${class})\nAND model_version in (${model_versions})\nORDER BY model_version, actual DESC",
-                    "refId": "A",
-                    "sql": {
-                        "columns": [
-                            {
-                                "parameters": [],
-                                "type": "function"
-                            }
-                        ],
-                        "groupBy": [
-                            {
-                                "property": {
-                                    "type": "string"
-                                },
-                                "type": "groupBy"
-                            }
-                        ],
-                        "limit": 50
-                    }
-                }
-            ],
-            "title": "Prediction Accuracy by Class in (${class})",
-            "type": "barchart"
-        },
-        {
-            "datasource": {
                 "default": true,
                 "type": "grafana-bigquery-datasource",
                 "uid": "P0871A590F805E5CD"
@@ -162,7 +52,7 @@
             "gridPos": {
                 "h": 8,
                 "w": 6,
-                "x": 12,
+                "x": 0,
                 "y": 0
             },
             "id": 2,
@@ -218,6 +108,121 @@
             ],
             "title": "Lifetime Prediction Accuracy - ${model_version_A}",
             "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "grafana-bigquery-datasource",
+                "uid": "P0871A590F805E5CD"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "fillOpacity": 40,
+                        "gradientMode": "hue",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 2,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 6,
+                "y": 0
+            },
+            "id": 4,
+            "options": {
+                "barRadius": 0,
+                "barWidth": 0.97,
+                "colorByField": "model_version",
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "orientation": "auto",
+                "showValue": "auto",
+                "stacking": "none",
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "single",
+                    "sort": "none"
+                },
+                "xTickLabelRotation": -30,
+                "xTickLabelSpacing": 0
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+                {
+                    "datasource": {
+                        "type": "grafana-bigquery-datasource",
+                        "uid": "P0871A590F805E5CD"
+                    },
+                    "editorMode": "code",
+                    "format": 1,
+                    "hide": false,
+                    "location": "",
+                    "project": "creature-vision",
+                    "rawQuery": true,
+                    "rawSql": "SELECT\n  model_version, AVG(CAST(is_correct AS INT64)) AS avg_prediction_accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\n  GROUP BY model_version\n  ORDER BY model_version",
+                    "refId": "A",
+                    "sql": {
+                        "columns": [
+                            {
+                                "parameters": [],
+                                "type": "function"
+                            }
+                        ],
+                        "groupBy": [
+                            {
+                                "property": {
+                                    "type": "string"
+                                },
+                                "type": "groupBy"
+                            }
+                        ],
+                        "limit": 50
+                    }
+                }
+            ],
+            "title": "Model Accuracy by Version",
+            "type": "barchart"
         },
         {
             "datasource": {
@@ -321,6 +326,227 @@
                         "axisBorderShow": false,
                         "axisCenteredZero": false,
                         "axisColorMode": "text",
+                        "axisLabel": "Num Predictions",
+                        "axisPlacement": "left",
+                        "fillOpacity": 80,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 1,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 8
+            },
+            "id": 7,
+            "options": {
+                "barRadius": 0.2,
+                "barWidth": 0.83,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "orientation": "auto",
+                "showValue": "auto",
+                "stacking": "normal",
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "multi",
+                    "sort": "desc"
+                },
+                "xField": "model_class",
+                "xTickLabelRotation": -45,
+                "xTickLabelSpacing": 0
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "format": 1,
+                    "location": "",
+                    "project": "creature-vision",
+                    "rawQuery": true,
+                    "rawSql": "WITH correct_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_correct\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = true\n  GROUP BY model_version, actual\n),\nincorrect_preds AS (\n  SELECT actual, model_version, COUNT(*) AS num_incorrect\n  FROM creature-vision.dog_prediction_app.prediction_metrics\n  WHERE is_correct = false\n  GROUP BY model_version, actual\n),\nmodel_summary AS (\n  SELECT\n    COALESCE(cp.model_version, ip.model_version) AS model_version,\n    COALESCE(cp.actual, ip.actual) AS actual,\n    SUM(IFNULL(cp.num_correct, 0)) AS total_correct_predictions,\n    SUM(IFNULL(ip.num_incorrect, 0)) AS total_incorrect_predictions\n  FROM correct_preds cp\n  FULL OUTER JOIN incorrect_preds ip\n    ON cp.model_version = ip.model_version AND cp.actual = ip.actual\n  GROUP BY model_version, actual\n)\nSELECT *, CONCAT(model_version, ' : ', actual) AS model_class\nFROM model_summary\nWHERE actual IN (${class})\nAND model_version in (${model_versions})\nORDER BY model_version, actual DESC",
+                    "refId": "A",
+                    "sql": {
+                        "columns": [
+                            {
+                                "parameters": [],
+                                "type": "function"
+                            }
+                        ],
+                        "groupBy": [
+                            {
+                                "property": {
+                                    "type": "string"
+                                },
+                                "type": "groupBy"
+                            }
+                        ],
+                        "limit": 50
+                    }
+                }
+            ],
+            "title": "Prediction Accuracy by Model + Class",
+            "type": "barchart"
+        },
+        {
+            "datasource": {
+                "type": "grafana-bigquery-datasource",
+                "uid": "P0871A590F805E5CD"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "Num Predictions",
+                        "axisPlacement": "left",
+                        "fillOpacity": 80,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 1,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 17
+            },
+            "id": 12,
+            "options": {
+                "barRadius": 0.2,
+                "barWidth": 0.83,
+                "colorByField": "model_class",
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "orientation": "auto",
+                "showValue": "auto",
+                "stacking": "normal",
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "multi",
+                    "sort": "desc"
+                },
+                "xField": "model_class",
+                "xTickLabelRotation": -45,
+                "xTickLabelSpacing": 0
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "format": 1,
+                    "location": "",
+                    "project": "creature-vision",
+                    "rawQuery": true,
+                    "rawSql": "SELECT\n  model_version,\n  class_label AS actual,\n  example_count,\n  run_timestamp,\n  CONCAT(model_version, ' : ', class_label) AS model_class\nFROM (\n  SELECT *,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM `creature-vision.training_metrics.class_distribution`\n  WHERE model_version IN (${model_versions})\n    AND class_label IN (${class})\n)\nWHERE row_num = 1\nORDER BY model_version, actual DESC\n",
+                    "refId": "A",
+                    "sql": {
+                        "columns": [
+                            {
+                                "parameters": [],
+                                "type": "function"
+                            }
+                        ],
+                        "groupBy": [
+                            {
+                                "property": {
+                                    "type": "string"
+                                },
+                                "type": "groupBy"
+                            }
+                        ],
+                        "limit": 50
+                    }
+                }
+            ],
+            "title": "Dataset Distribution by Class + Model",
+            "type": "barchart"
+        },
+        {
+            "datasource": {
+                "type": "grafana-bigquery-datasource",
+                "uid": "P0871A590F805E5CD"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
                         "axisLabel": "",
                         "axisPlacement": "auto",
                         "fillOpacity": 80,
@@ -359,7 +585,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 8
+                "y": 25
             },
             "id": 11,
             "options": {
@@ -453,8 +679,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -469,7 +694,7 @@
                 "h": 9,
                 "w": 24,
                 "x": 0,
-                "y": 18
+                "y": 35
             },
             "id": 8,
             "options": {
@@ -566,8 +791,7 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "red",
@@ -582,7 +806,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 27
+                "y": 44
             },
             "id": 9,
             "options": {
@@ -645,121 +869,6 @@
         },
         {
             "datasource": {
-                "type": "grafana-bigquery-datasource",
-                "uid": "P0871A590F805E5CD"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "axisBorderShow": false,
-                        "axisCenteredZero": false,
-                        "axisColorMode": "text",
-                        "axisLabel": "",
-                        "axisPlacement": "auto",
-                        "fillOpacity": 40,
-                        "gradientMode": "hue",
-                        "hideFrom": {
-                            "legend": false,
-                            "tooltip": false,
-                            "viz": false
-                        },
-                        "lineWidth": 2,
-                        "scaleDistribution": {
-                            "type": "linear"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
-                    },
-                    "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            },
-                            {
-                                "color": "red",
-                                "value": 80
-                            }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
-            "gridPos": {
-                "h": 8,
-                "w": 11,
-                "x": 0,
-                "y": 37
-            },
-            "id": 4,
-            "options": {
-                "barRadius": 0,
-                "barWidth": 0.97,
-                "colorByField": "model_version",
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                    "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom",
-                    "showLegend": true
-                },
-                "orientation": "auto",
-                "showValue": "auto",
-                "stacking": "none",
-                "tooltip": {
-                    "hideZeros": false,
-                    "mode": "single",
-                    "sort": "none"
-                },
-                "xTickLabelRotation": -30,
-                "xTickLabelSpacing": 0
-            },
-            "pluginVersion": "11.5.2",
-            "targets": [
-                {
-                    "datasource": {
-                        "type": "grafana-bigquery-datasource",
-                        "uid": "P0871A590F805E5CD"
-                    },
-                    "editorMode": "code",
-                    "format": 1,
-                    "hide": false,
-                    "location": "",
-                    "project": "creature-vision",
-                    "rawQuery": true,
-                    "rawSql": "SELECT\n  model_version, AVG(CAST(is_correct AS INT64)) AS avg_prediction_accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\n  GROUP BY model_version\n  ORDER BY model_version",
-                    "refId": "A",
-                    "sql": {
-                        "columns": [
-                            {
-                                "parameters": [],
-                                "type": "function"
-                            }
-                        ],
-                        "groupBy": [
-                            {
-                                "property": {
-                                    "type": "string"
-                                },
-                                "type": "groupBy"
-                            }
-                        ],
-                        "limit": 50
-                    }
-                }
-            ],
-            "title": "Model Accuracy by Version",
-            "type": "barchart"
-        },
-        {
-            "datasource": {
                 "default": true,
                 "type": "grafana-bigquery-datasource",
                 "uid": "P0871A590F805E5CD"
@@ -809,8 +918,7 @@
                         "mode": "percentage",
                         "steps": [
                             {
-                                "color": "green",
-                                "value": null
+                                "color": "green"
                             },
                             {
                                 "color": "orange",
@@ -826,7 +934,7 @@
                 "h": 8,
                 "w": 13,
                 "x": 11,
-                "y": 37
+                "y": 54
             },
             "id": 1,
             "options": {
@@ -927,7 +1035,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 45
+                "y": 62
             },
             "id": 5,
             "options": {
@@ -1032,7 +1140,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 55
+                "y": 72
             },
             "id": 6,
             "options": {
@@ -1102,10 +1210,12 @@
                 "allowCustomValue": false,
                 "current": {
                     "text": [
-                        "v3_0"
+                        "v3_3",
+                        "v3_4"
                     ],
                     "value": [
-                        "v3_0"
+                        "v3_3",
+                        "v3_4"
                     ]
                 },
                 "datasource": {
@@ -1151,12 +1261,20 @@
                 "allowCustomValue": false,
                 "current": {
                     "text": [
-                        "buhund norwegian",
-                        "danish swedish farmdog"
+                        "bakharwal indian",
+                        "airedale",
+                        "basenji",
+                        "beagle",
+                        "bulldog english",
+                        "bulldog french"
                     ],
                     "value": [
-                        "buhund norwegian",
-                        "danish swedish farmdog"
+                        "bakharwal indian",
+                        "airedale",
+                        "basenji",
+                        "beagle",
+                        "bulldog english",
+                        "bulldog french"
                     ]
                 },
                 "definition": "",
@@ -1238,8 +1356,8 @@
             {
                 "allowCustomValue": false,
                 "current": {
-                    "text": "v3_4",
-                    "value": "v3_4"
+                    "text": "v3_3",
+                    "value": "v3_3"
                 },
                 "definition": "",
                 "name": "model_version_B",
@@ -1284,6 +1402,6 @@
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 85,
+    "version": 92,
     "weekStart": ""
 }
