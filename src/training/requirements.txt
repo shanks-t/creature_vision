@@ -1,4 +1,6 @@
 pillow
 google-cloud-storage
 google-cloud-bigquery
+pythonjsonlogger>=2.0.7
+
 
