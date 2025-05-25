@@ -509,7 +509,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  model_version,\n  class_label AS actual,\n  example_count,\n  run_timestamp,\n  CONCAT(model_version, ' : ', class_label) AS model_class\nFROM (\n  SELECT *,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM `creature-vision.training_metrics.class_distribution`\n  WHERE model_version IN (${model_versions})\n    AND class_label IN (${class})\n)\nWHERE row_num = 1\nORDER BY model_version, actual DESC\n",
+                    "rawSql": "SELECT\n  model_version,\n  class_label AS actual,\n  example_count,\n  run_timestamp,\n  CONCAT(model_version, ' : ', class_label) AS model_class\nFROM (\n  SELECT *,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM `creature-vision.dataset_distribution.class_distribution`\n  WHERE model_version IN (${model_versions})\n    AND class_label IN (${class})\n)\nWHERE row_num = 1\nORDER BY model_version, actual DESC\n",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -619,7 +619,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "WITH latest_runs AS (\n  SELECT\n    model_version,\n    class_label,\n    label_id,\n    example_count,\n    run_timestamp,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM\n    `creature-vision.training_metrics.class_distribution`\n)\n\nSELECT\n  model_version,\n  class_label,\n  example_count\nFROM\n  latest_runs\nWHERE\n  row_num = 1\n  AND model_version = '${model_version_A}'\nORDER BY\n  example_count,\n  class_label\n",
+                    "rawSql": "WITH latest_runs AS (\n  SELECT\n    model_version,\n    class_label,\n    label_id,\n    example_count,\n    run_timestamp,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM\n    `creature-vision.dataset_distribution.class_distribution`\n)\n\nSELECT\n  model_version,\n  class_label,\n  example_count\nFROM\n  latest_runs\nWHERE\n  row_num = 1\n  AND model_version = '${model_version_A}'\nORDER BY\n  example_count,\n  class_label\n",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -679,7 +679,8 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green"
+                                "color": "green",
+                                "value": null
                             },
                             {
                                 "color": "red",
@@ -791,7 +792,8 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green"
+                                "color": "green",
+                                "value": null
                             },
                             {
                                 "color": "red",
@@ -918,7 +920,8 @@
                         "mode": "percentage",
                         "steps": [
                             {
-                                "color": "green"
+                                "color": "green",
+                                "value": null
                             },
                             {
                                 "color": "orange",
@@ -1210,12 +1213,12 @@
                 "allowCustomValue": false,
                 "current": {
                     "text": [
-                        "v3_3",
-                        "v3_4"
+                        "v3_0",
+                        "v3_1"
                     ],
                     "value": [
-                        "v3_3",
-                        "v3_4"
+                        "v3_0",
+                        "v3_1"
                     ]
                 },
                 "datasource": {
@@ -1261,20 +1264,16 @@
                 "allowCustomValue": false,
                 "current": {
                     "text": [
-                        "bakharwal indian",
                         "airedale",
                         "basenji",
                         "beagle",
-                        "bulldog english",
-                        "bulldog french"
+                        "bulldog english"
                     ],
                     "value": [
-                        "bakharwal indian",
                         "airedale",
                         "basenji",
                         "beagle",
-                        "bulldog english",
-                        "bulldog french"
+                        "bulldog english"
                     ]
                 },
                 "definition": "",
@@ -1317,8 +1316,8 @@
             {
                 "allowCustomValue": false,
                 "current": {
-                    "text": "v3_4",
-                    "value": "v3_4"
+                    "text": "v3_1",
+                    "value": "v3_1"
                 },
                 "definition": "",
                 "name": "model_version_A",
@@ -1356,8 +1355,8 @@
             {
                 "allowCustomValue": false,
                 "current": {
-                    "text": "v3_3",
-                    "value": "v3_3"
+                    "text": "v3_0",
+                    "value": "v3_0"
                 },
                 "definition": "",
                 "name": "model_version_B",
@@ -1402,6 +1401,6 @@
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 92,
+    "version": 95,
     "weekStart": ""
 }
