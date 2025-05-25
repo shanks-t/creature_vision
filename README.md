@@ -7,9 +7,9 @@ This project implements a **continual learning pipeline** for dog breed classifi
 Creature Vision fetches dog images from a **free API**, processes them through an **inference service**, logs **accuracy and latency metrics**, and stores images for **future training**. The system then preprocesses the data, retrains the model on new data, and redeploys it, completing a **self-improving ML pipeline**.
 
 ## **Demo Videos**
-[Overview](https://youtu.be/_AHTLu679sg)
-[Champion/Challenger](https://youtu.be/2J20L-5yWIk)
-[Kubelfow and ML Lifecycle](https://youtu.be/NxDV6e29O94)
+- [Overview](https://youtu.be/_AHTLu679sg)
+- [Champion/Challenger](https://youtu.be/2J20L-5yWIk)
+- [Kubelfow and ML Lifecycle](https://youtu.be/NxDV6e29O94)
 
 ## **Key Features**
 
