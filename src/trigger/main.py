@@ -94,7 +94,6 @@ def trigger_pipeline(
     service_to_update,
     new_model_version,
     previous_model_version,
-    max_files,
     use_caching,
 ):
     aiplatform.init(project=PROJECT_ID, location=REGION, staging_bucket=PIPELINE_ROOT)
@@ -114,7 +113,6 @@ def trigger_pipeline(
             "model_version": new_model_version,
             "previous_model_version": previous_model_version,
             "service_to_update": service_to_update,
-            "max_files": max_files,
         },
         enable_caching=use_caching,
     )
@@ -125,19 +123,16 @@ def trigger_pipeline(
 def run_pipeline_trigger(request):
     print("Triggered pipeline orchestration via Cloud Function.")
 
-    max_files = "1200"
     use_caching = False  # default
 
     if request.method == "POST":
         try:
             request_json = request.get_json(silent=True)
             if request_json:
-                max_files = str(request_json.get("max_files", max_files))
                 use_caching = bool(request_json.get("use_caching", use_caching))
         except Exception as e:
             print(f"Error parsing request: {e}")
     elif request.method == "GET":
-        max_files = request.args.get("max_files", "1200")
         use_caching = request.args.get("use_caching", "false").lower() == "true"
 
     # Step 1: Load model versions
@@ -159,7 +154,6 @@ def run_pipeline_trigger(request):
         service_to_update=service_to_update,
         new_model_version=new_model_version,
         previous_model_version=current_version,
-        max_files=max_files,
         use_caching=use_caching,
     )
 
@@ -169,7 +163,6 @@ def run_pipeline_trigger(request):
         "prev_model_version": current_version,
         "new_model_version": new_model_version,
         "state": job.state.name,
-        "max_files": max_files,
         "caching_enabled": use_caching,
         "pipeline_url": f"https://console.cloud.google.com/vertex-ai/locations/{REGION}/pipelines/runs/{job.resource_name.split('/')[-1]}?project={PROJECT_ID}",
     }, 200

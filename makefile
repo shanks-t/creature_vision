@@ -30,8 +30,8 @@ endif
 # Image Tag
 IMAGE_TAG := ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${APP_NAME}/${SERVICE}:${VERSION}
 TAR_FILE=${SERVICE}.tar  # Define the tar file for saving the image
-# Dataflow parameters
-MAXFILES ?= 500
+
+# kubeflow parameters
 RANDOM_SEED ?= 42
 SERVICE_NAME ?=
 MODEL_VERSION ?=
@@ -95,11 +95,11 @@ create-df-template:
 	--metadata-file=./src/preprocessing/metadata.json
 
 run-dataflow:
-	@echo "Running Dataflow job with max_files=$(MAXFILES)..."
+	@echo "Running Dataflow job with max_files=$(MAXFILES) and version=$(VERSION)..."
 	gcloud dataflow flex-template run "creature-vis-processing" \
 	--template-file-gcs-location=gs://dataflow-use1/templates/creature-vision-template.json \
 	--region=us-east1 \
-	--parameters=max_files=$(MAXFILES)
+	--parameters=max_files=$(MAXFILES),version=$(VERSION)
 
 run-monitoring:
 	docker compose -f docker/inference/docker-compose.grafana.yaml up --build
@@ -155,7 +155,7 @@ test-run-inf:
 test-pipeline-cf:
 	curl -X POST https://us-east1-creature-vision.cloudfunctions.net/trigger-creature-pipeline \
 	-H "Content-Type: application/json" \
-	-d '{"max_files": "$(MAX_FILES)", "use_caching": "${USE_CACHE}"}'
+	-d '{"use_caching": "${USE_CACHE}"}'
 
 
 deploy-pipeline-cf: compile-pipeline

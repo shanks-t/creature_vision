@@ -46,10 +46,10 @@ class FormatLabelStatsForBigQuery(beam.DoFn):
 class GCSImagePathProvider(beam.PTransform):
     """Provides image paths from GCS for streaming processing"""
 
-    def __init__(self, bucket_name, max_files=None, random_seed=None):
+    def __init__(self, bucket_name, version, random_seed=None):
         super().__init__()
         self.bucket_name = bucket_name
-        self.max_files = max_files
+        self.version = version
         self.random_seed = random_seed
 
     def expand(self, pcoll):
@@ -59,17 +59,49 @@ class GCSImagePathProvider(beam.PTransform):
 
             client = storage.Client(project="creature-vision")
             bucket = client.bucket(self.bucket_name)
+            version_prefix = self.version.split("_")[0]
+            prev_version_num = int(self.version.split("_")[1]) - 1
+            prev_version = version_prefix + "_" + str(prev_version_num)
+            all_version_dirs = tf.io.gfile.listdir(f"gs://{self.bucket_name}/")
 
-            all_paths = []
-            for prefix in ["incorrect_predictions/"]:
-                # Correct method to list blobs
-                blobs = bucket.list_blobs(prefix=prefix)
-                for blob in blobs:
-                    if blob.name.endswith(".jpg"):
-                        all_paths.append(blob.name)
+            all_paths_current_prev_version = []
+            prefix = f"{prev_version}/incorrect_predictions/"
+            # Correct method to list blobs
+            blobs = bucket.list_blobs(prefix=prefix)
+            for blob in blobs:
+                if blob.name.endswith(".jpg"):
+                    all_paths_current_prev_version.append(blob.name)
 
-            random.shuffle(all_paths)
-            return all_paths[: self.max_files] if self.max_files else all_paths
+            eligible_versions = [
+                v.rstrip("/")
+                for v in all_version_dirs
+                if v.startswith(version_prefix) and v.rstrip("/") != prev_version
+            ]
+
+            all_prev_jpgs = []
+            for version in eligible_versions:
+                for pred_type in ["incorrect_predictions/", "correct_predictions/"]:
+                    prefix = f"{version}/{pred_type}"
+                    blobs = bucket.list_blobs(prefix=prefix)
+                    all_prev_jpgs.extend(
+                        [blob.name for blob in blobs if blob.name.endswith(".jpg")]
+                    )
+
+            num_to_sample = int(len(all_prev_jpgs) * 0.2)
+            sampled_prev_paths = (
+                random.sample(all_prev_jpgs, num_to_sample) if num_to_sample > 0 else []
+            )
+
+            combined = all_paths_current_prev_version + sampled_prev_paths
+
+            # print(
+            #     f"[DEBUG] Current prev version ({prev_version}) paths: {len(all_paths_current_prev_version)}"
+            # )
+            # print(f"[DEBUG] Sampled previous version paths: {len(sampled_prev_paths)}")
+            # print(sampled_prev_paths)
+            # print(f"[DEBUG] Total image paths returned: {len(combined)}")
+
+            return combined
 
         return pcoll | beam.Create(list_image_paths())
 
@@ -88,10 +120,6 @@ class ProcessImageAndLabel(beam.DoFn):
         self.bucket = self.client.bucket(self.bucket_name)
 
     def process(self, image_path):
-        # Apache Beam expects the process method to:
-        # Return an iterable (list or generator).
-        outputs = []
-
         try:
             label_path = image_path.replace(".jpg", "_labels.json")
             filename = os.path.basename(image_path).split(".")[0]
@@ -166,8 +194,7 @@ class ProcessDataPipeline:
         version: str,
         use_dataflow: bool = True,
         region: str = "us-east1",
-        max_files: int = None,
-        random_seed: int = None,
+        random_seed: int = 0,
         max_num_workers: int = 2,
         number_of_worker_harness_threads: int = 4,
         machine_type: str = "n1-standard-2",
@@ -176,7 +203,7 @@ class ProcessDataPipeline:
 
         self.logger.info("Updating label map before starting the pipeline...")
 
-        # **Step 2**: Load the updated label map
+        # load the updated label map
         client = storage.Client(project="creature-vision")
         bucket = client.bucket(self.dataset_bucket_name)
         blob = bucket.blob("processed/metadata/label_map.json")
@@ -185,7 +212,7 @@ class ProcessDataPipeline:
         output_path = f"gs://{self.dataset_bucket_name}/processed/{version}/data"
         self.logger.info(f"Output path: {output_path}")
 
-        # **Step 3**: Configure Beam pipeline options
+        # configure Beam pipeline options
         pipeline_options = {
             "project": self.project_id,
             "temp_location": f"gs://{self.dataflow_bucket_name}/temp",
@@ -217,7 +244,7 @@ class ProcessDataPipeline:
 
         options = beam.options.pipeline_options.PipelineOptions(**pipeline_options)
 
-        # **Step 4**: Start Beam pipeline
+        # Start Beam pipeline
         self.logger.info("Starting Apache Beam pipeline")
         with timer(self.logger, "Apache Beam pipeline execution"):
             with beam.Pipeline(options=options) as p:
@@ -225,7 +252,9 @@ class ProcessDataPipeline:
                     p
                     | "GetImagePaths"
                     >> GCSImagePathProvider(
-                        self.dataset_bucket_name, max_files, random_seed=random_seed
+                        self.dataset_bucket_name,
+                        version,
+                        random_seed=random_seed,
                     )
                     | "ProcessImagesAndLabels"
                     >> beam.ParDo(
@@ -233,7 +262,7 @@ class ProcessDataPipeline:
                     ).with_outputs("tfrecord", "label_stats")
                 )
 
-                # TFRecord output (unchanged)
+                # TFRecord output
                 _ = (
                     results.tfrecord
                     | "WriteTFRecord"
@@ -243,7 +272,7 @@ class ProcessDataPipeline:
                     )
                 )
 
-                # NEW: Class distribution stats to BigQuery
+                # add class distribution stats to BigQuery
                 (
                     results.label_stats
                     | "CountByClass" >> beam.combiners.Count.PerElement()
@@ -251,7 +280,7 @@ class ProcessDataPipeline:
                     >> beam.ParDo(FormatLabelStatsForBigQuery(model_version=version))
                     | "WriteStatsToBQ"
                     >> beam.io.WriteToBigQuery(
-                        table=f"{self.project_id}.training_metrics.class_distribution",
+                        table=f"{self.project_id}.dataset_distribution.class_distribution",
                         schema={
                             "fields": [
                                 {
