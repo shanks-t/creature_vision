@@ -119,7 +119,6 @@ def creature_vision_pipeline(
     model_version: str,
     previous_model_version: str,
     service_to_update: str,
-    max_files: str = "1000",
 ):
     df_job_name = (
         f"creature-vis-training-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
@@ -128,7 +127,7 @@ def creature_vision_pipeline(
         location=region,
         container_spec_gcs_path=gcs_template_path,
         job_name=df_job_name,
-        parameters={"version": model_version, "max_files": max_files},
+        parameters={"version": model_version},
         service_account_email=service_account,
         launch_options={"enable_preflight_validation": "false"},
     )
