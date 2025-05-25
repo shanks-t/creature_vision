@@ -116,9 +116,13 @@ def load_random_dog_image():
 
 
 # Function to save images and labels in GCS
-def save_image_and_label(img, model_label, api_label, is_correct):
+def save_image_and_label(img, model_label, api_label, is_correct, model_version):
     """Store the prediction results in GCS."""
-    directory = "correct_predictions" if is_correct else "incorrect_predictions"
+    directory = (
+        f"{model_version}/correct_predictions"
+        if is_correct
+        else f"{model_version}/incorrect_predictions"
+    )
     timestamp = int(time.time())
     base_filename = (
         f"{model_label}_{timestamp}" if is_correct else f"{api_label}_{timestamp}"
@@ -266,7 +270,7 @@ def run_prediction():
             "latency": latency,
         }
 
-        save_image_and_label(img, model_label, api_label, is_correct)
+        save_image_and_label(img, model_label, api_label, is_correct, model_version)
         insert_prediction_data(
             api_label, model_label, is_correct, latency, confidence, model_version
         )
