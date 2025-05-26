@@ -9,3 +9,6 @@ Things to explore:
 - ~~delete images from gcs to reset raw data~~
 - ~~reset pipeline and start over at base model~~
 
+Other Goals:
+- MCP server for interpretations of model performance
+
