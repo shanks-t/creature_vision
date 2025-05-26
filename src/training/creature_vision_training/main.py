@@ -67,7 +67,7 @@ def main():
     # Dataset preparation
     train_ds, val_ds, label_map = create_training_dataset(
         bucket_name=BUCKET_NAME,
-        tfrecord_path="processed",
+        tfrecord_path=f"processed/{args.version}",
         labels_path="processed/metadata",
         batch_size=BATCH_SIZE,
         model_version=NEW_VERSION,
