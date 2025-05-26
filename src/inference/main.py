@@ -269,8 +269,11 @@ def run_prediction():
             "confidence": confidence,
             "latency": latency,
         }
+        # Only save images from fine-tuned models to prevent skewing dataset
+        if model_version != "v3_0":
+            save_image_and_label(img, model_label, api_label, is_correct, model_version)
 
-        save_image_and_label(img, model_label, api_label, is_correct, model_version)
+        # Log metrics for all models
         insert_prediction_data(
             api_label, model_label, is_correct, latency, confidence, model_version
         )

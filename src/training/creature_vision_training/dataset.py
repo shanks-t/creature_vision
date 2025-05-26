@@ -62,45 +62,19 @@ def create_training_dataset(
     Creates training and validation datasets that includes all TFRecords for the
     given model_version and a percentage of TFRecords from other versions.
     """
-    # Get all TFRecord files
-    all_tfrecords = tf.io.gfile.glob(
-        f"gs://{bucket_name}/{tfrecord_path}/**/*.tfrecord"
-    )
 
-    if not all_tfrecords:
+    # Get all TFRecord files
+    tfrecords = tf.io.gfile.glob(f"gs://{bucket_name}/{tfrecord_path}/*.tfrecord")
+    print(f"tf record path: {tfrecord_path}")
+    if not tfrecords:
         raise FileNotFoundError(f"No TFRecord files found at {tfrecord_path}")
 
-    # Separate current and previous model version TFRecords
-    current_version_records = [
-        f
-        for f in all_tfrecords
-        if f"{model_version}_" in f or f"/{model_version}/" in f
-    ]
-    previous_version_records = [
-        f for f in all_tfrecords if f not in current_version_records
-    ]
-
-    if not current_version_records:
-        raise ValueError(f"No TFRecords found for model version: {model_version}")
-
-    # Sample percentage of previous version records
-    sampled_previous_records = random.sample(
-        previous_version_records,
-        int(len(previous_version_records) * sample_pct_other_versions),
-    )
-
-    print(
-        f"Using {len(current_version_records)} current + {len(sampled_previous_records)} previous TFRecords"
-    )
-
-    # Combine datasets
-    files_to_load = current_version_records + sampled_previous_records
-    dataset = tf.data.TFRecordDataset(files_to_load)
+    dataset = tf.data.TFRecordDataset(tfrecords)
 
     # Count examples
     dataset_size = sum(1 for _ in dataset)
     if dataset_size == 0:
-        raise ValueError("Combined TFRecord dataset is empty")
+        raise ValueError("TFRecord dataset is empty")
 
     # Parse and split dataset
     dataset = dataset.map(parse_tfrecord_fn, num_parallel_calls=tf.data.AUTOTUNE)
