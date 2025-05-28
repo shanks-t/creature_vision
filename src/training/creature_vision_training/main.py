@@ -5,6 +5,9 @@ import sys
 
 from google.cloud import aiplatform
 
+import tensorflow as tf
+from tensorflow.keras import mixed_precision
+
 from creature_vision_training.model import (
     setup_model,
     run_training,
@@ -44,18 +47,25 @@ def main():
     BUCKET_NAME = os.getenv("TRAINING_BUCKET", "creature-vision-training-set")
     BATCH_SIZE = int(os.getenv("BATCH_SIZE", "32"))
     PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "creature-vision")
-    LOCATION = os.getenv("CLOUD_LOCATION", "us-central1")
+    LOCATION = os.getenv("CLOUD_LOCATION", "us-east1")
     MODEL_BUCKET = os.getenv("MODEL_BUCKET", "tf_models_cv")
     STAGING_BUCKET = os.getenv("STAGING_BUCKET", "creture-vision-ml-artifacts")
-    AIP_TENSORBOARD_LOG_DIR = os.getenv(
-        "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local"
-    )
+    # AIP_TENSORBOARD_LOG_DIR = os.getenv(
+    #     "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local"
+    # )
     NEW_VERSION = args.version
     if args.previous_model_version == "None":
         args.previous_model_version = None
 
     print(f"Starting training with version: {args.version}")
     print(f"Previous model version: {args.previous_model_version}")
+
+    use_gpu = bool(tf.config.list_physical_devices("GPU"))
+    if use_gpu:
+        print("GPU detected — enabling mixed precision")
+        mixed_precision.set_global_policy("mixed_float16")
+    else:
+        print("No GPU detected — training will use CPU")
 
     experiment_config = {
         "experiment_name": f"{NEW_VERSION.replace('_', '-')}",
@@ -70,8 +80,8 @@ def main():
         tfrecord_path=f"processed/{args.version}",
         labels_path="processed/metadata",
         batch_size=BATCH_SIZE,
-        model_version=NEW_VERSION,
         validation_split=0.3,
+        gpu=use_gpu,
     )
 
     # Model initialization

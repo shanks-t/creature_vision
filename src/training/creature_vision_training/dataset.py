@@ -1,6 +1,5 @@
 from typing import Tuple, Any
 import json
-import random
 
 import tensorflow as tf
 
@@ -19,9 +18,6 @@ def parse_tfrecord_fn(example_proto):
 
     # Ensure the shape is correct
     image = tf.ensure_shape(image, [224, 224, 3])
-
-    # Cast to float32 after parsing
-    # image = tf.cast(image, tf.float32)
 
     return image, features["label"]
 
@@ -43,8 +39,8 @@ def get_augmentation_fn():
 
     def augment_fn(image, label):
         # Ensures augmentation is applied
-        image = augment(image, training=True)
-        return image, label
+        images = augment(image, training=True)
+        return images, label
 
     return augment_fn
 
@@ -54,9 +50,8 @@ def create_training_dataset(
     tfrecord_path: str,
     labels_path: str,
     batch_size: int,
-    model_version: str,
-    sample_pct_other_versions: float = 0.2,
     validation_split: float = 0.2,
+    gpu: bool = False,
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset, Any]:
     """
     Creates training and validation datasets that includes all TFRecords for the
@@ -69,12 +64,23 @@ def create_training_dataset(
     if not tfrecords:
         raise FileNotFoundError(f"No TFRecord files found at {tfrecord_path}")
 
-    dataset = tf.data.TFRecordDataset(tfrecords)
+    dataset = tf.data.Dataset.from_tensor_slices(tfrecords)
+    dataset = dataset.interleave(
+        lambda x: tf.data.TFRecordDataset(x).prefetch(1),
+        cycle_length=min(len(tfrecords), 8),
+        num_parallel_calls=tf.data.AUTOTUNE,
+        deterministic=False,
+    )
 
-    # Count examples
-    dataset_size = sum(1 for _ in dataset)
-    if dataset_size == 0:
-        raise ValueError("TFRecord dataset is empty")
+    with tf.io.gfile.GFile(f"gs://{bucket_name}/{tfrecord_path}/metadata.json") as f:
+        meta = json.load(f)
+        dataset_size = meta["dataset_size"]
+
+    # Set autotune parameters for gpu
+    # num_parallel_calls = tf.data.AUTOTUNE if gpu else 4
+    # shuffle_buffer = 2048 if gpu else 1000
+    # prefetch_buffer = tf.data.AUTOTUNE if gpu else 1
+    # batch_size_opt = 64 if gpu else batch_size
 
     # Parse and split dataset
     dataset = dataset.map(parse_tfrecord_fn, num_parallel_calls=tf.data.AUTOTUNE)
@@ -82,6 +88,9 @@ def create_training_dataset(
 
     train_ds = dataset.skip(val_size)
     val_ds = dataset.take(val_size)
+
+    steps_per_epoch = (dataset_size - val_size) // batch_size
+    validation_steps = val_size // batch_size
 
     # Label map loading
     label_map_path = f"gs://{bucket_name}/{labels_path}/label_map.json"
@@ -93,9 +102,9 @@ def create_training_dataset(
 
     # Augmentation and batching
     augment_fn = get_augmentation_fn()
-    train_ds = train_ds.map(augment_fn, num_parallel_calls=tf.data.AUTOTUNE)
     train_ds = (
-        train_ds.shuffle(buffer_size=dataset_size)
+        train_ds.map(augment_fn, num_parallel_calls=tf.data.AUTOTUNE)
+        .shuffle(buffer_size=1000)
         .batch(batch_size)
         .prefetch(tf.data.AUTOTUNE)
     )

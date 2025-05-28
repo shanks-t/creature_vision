@@ -2,6 +2,7 @@ import re
 import os
 from collections import Counter
 from io import StringIO
+from datetime import datetime
 
 import tensorflow as tf
 from google.cloud import aiplatform
@@ -19,9 +20,12 @@ def setup_model(
         tf.keras.metrics.SparseTopKCategoricalAccuracy(k=5, name="top_5_accuracy"),
         tf.keras.metrics.SparseCategoricalCrossentropy(name="cross_entropy"),
     ]
-    log_dir = os.getenv(
-        "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local"
+    base_log_dir = os.getenv(
+        "AIP_TENSORBOARD_LOG_DIR",
+        "gs://creture-vision-ml-artifacts/manual",
     )
+    date_hour = datetime.now().strftime("%Y-%m-%d-%H")
+    log_dir = os.path.join(base_log_dir, date_hour)
 
     # Learning rate schedule (optional)
     def lr_schedule(epoch, lr):
@@ -34,7 +38,7 @@ def setup_model(
         tf.keras.callbacks.TensorBoard(
             log_dir=log_dir,
             histogram_freq=1,
-            profile_batch=(50, 100),
+            profile_batch=(0, 10),
             update_freq="epoch",
         ),
         tf.keras.callbacks.EarlyStopping(
@@ -57,6 +61,8 @@ def run_training(
     callbacks: list,
     class_weight: dict,
     epochs: int = 100,
+    steps_per_epoch: int = 0,
+    validation_steps: int = 0,
     learning_rate: float = 1e-3,
 ) -> tf.keras.Model:
     """Executes training within Vertex AI run context"""
