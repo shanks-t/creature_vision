@@ -44,7 +44,7 @@ class FormatLabelStatsForBigQuery(beam.DoFn):
 
 
 class GCSImagePathProvider(beam.PTransform):
-    """Provides image paths from GCS for streaming processing"""
+    """Provides image paths from GCS for streaming processing."""
 
     def __init__(self, bucket_name, version, random_seed=None):
         super().__init__()
@@ -59,49 +59,45 @@ class GCSImagePathProvider(beam.PTransform):
 
             client = storage.Client(project="creature-vision")
             bucket = client.bucket(self.bucket_name)
-            version_prefix = self.version.split("_")[0]
-            prev_version_num = int(self.version.split("_")[1]) - 1
-            prev_version = version_prefix + "_" + str(prev_version_num)
-            all_version_dirs = tf.io.gfile.listdir(f"gs://{self.bucket_name}/")
 
-            all_paths_current_prev_version = []
-            prefix = f"{prev_version}/incorrect_predictions/"
-            # Correct method to list blobs
-            blobs = bucket.list_blobs(prefix=prefix)
-            for blob in blobs:
-                if blob.name.endswith(".jpg"):
-                    all_paths_current_prev_version.append(blob.name)
+            version_prefix, version_number_str = self.version.split("_")
+            version_number = int(version_number_str)
 
-            eligible_versions = [
-                v.rstrip("/")
-                for v in all_version_dirs
-                if v.startswith(version_prefix) and v.rstrip("/") != prev_version
+            all_dirs = tf.io.gfile.listdir(f"gs://{self.bucket_name}/")
+
+            # Normalize to just directory names (e.g., "v3_2", "v3_3")
+            version_dirs = [
+                d.rstrip("/") for d in all_dirs if d.startswith(version_prefix + "_")
             ]
 
-            all_prev_jpgs = []
-            for version in eligible_versions:
-                for pred_type in ["incorrect_predictions/", "correct_predictions/"]:
-                    prefix = f"{version}/{pred_type}"
-                    blobs = bucket.list_blobs(prefix=prefix)
-                    all_prev_jpgs.extend(
-                        [blob.name for blob in blobs if blob.name.endswith(".jpg")]
-                    )
+            all_version_paths = []
+            current_prefix = f"{self.version}/incorrect_predictions/"
+            for blob in bucket.list_blobs(prefix=current_prefix):
+                if blob.name.endswith(".jpg"):
+                    all_version_paths.append(blob.name)
 
-            num_to_sample = int(len(all_prev_jpgs) * 0.2)
-            sampled_prev_paths = (
-                random.sample(all_prev_jpgs, num_to_sample) if num_to_sample > 0 else []
-            )
+            sampled_previous_paths = []
+            for version_dir in version_dirs:
+                try:
+                    version_num = int(version_dir.split("_")[1])
+                except (IndexError, ValueError):
+                    continue
 
-            combined = all_paths_current_prev_version + sampled_prev_paths
+                if version_num >= version_number:
+                    continue  # Skip current and future versions
 
-            # print(
-            #     f"[DEBUG] Current prev version ({prev_version}) paths: {len(all_paths_current_prev_version)}"
-            # )
-            # print(f"[DEBUG] Sampled previous version paths: {len(sampled_prev_paths)}")
-            # print(sampled_prev_paths)
-            # print(f"[DEBUG] Total image paths returned: {len(combined)}")
+                prefix = f"{version_dir}/incorrect_predictions/"
+                prev_version_jpgs = [
+                    blob.name
+                    for blob in bucket.list_blobs(prefix=prefix)
+                    if blob.name.endswith(".jpg")
+                ]
+                sample_size = int(len(prev_version_jpgs) * 0.2)
+                if sample_size > 0:
+                    sampled = random.sample(prev_version_jpgs, sample_size)
+                    sampled_previous_paths.extend(sampled)
 
-            return combined
+            return all_version_paths + sampled_previous_paths
 
         return pcoll | beam.Create(list_image_paths())
 
@@ -270,6 +266,19 @@ class ProcessDataPipeline:
                         output_path,
                         file_name_suffix=".tfrecord",
                     )
+                )
+
+                example_count = (
+                    results.tfrecord
+                    | "CountExamples" >> beam.combiners.Count.Globally()
+                    | "FormatMetadataJSON"
+                    >> beam.Map(lambda count: json.dumps({"dataset_size": count}))
+                )
+
+                _ = example_count | "WriteMetadataFile" >> beam.io.WriteToText(
+                    file_path_prefix=f"gs://{self.dataset_bucket_name}/processed/{version}/metadata",
+                    file_name_suffix=".json",
+                    shard_name_template="",  # optional: don't add shard suffix
                 )
 
                 # add class distribution stats to BigQuery
