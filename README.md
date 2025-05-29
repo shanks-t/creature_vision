@@ -10,6 +10,7 @@ Creature Vision fetches dog images from a **free API**, processes them through a
 - [Overview](https://www.youtube.com/watch?v=NxDV6e29O94)
 - [Champion/Challenger](https://youtu.be/2J20L-5yWIk)
 - [Kubelfow and ML Lifecycle](https://youtu.be/_AHTLu679sg)
+- [Data Distribution Monitoring, KL Divergence](https://www.youtube.com/watch?v=FLaOxPyXO6s)
 
 ## **Key Features**
 
