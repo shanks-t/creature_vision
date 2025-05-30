@@ -23,14 +23,34 @@
     "panels": [
         {
             "datasource": {
-                "default": true,
                 "type": "grafana-bigquery-datasource",
                 "uid": "P0871A590F805E5CD"
             },
             "fieldConfig": {
                 "defaults": {
                     "color": {
-                        "mode": "thresholds"
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "fillOpacity": 80,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 1,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
                     },
                     "mappings": [],
                     "thresholds": {
@@ -51,41 +71,44 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 6,
+                "w": 12,
                 "x": 0,
                 "y": 0
             },
-            "id": 2,
+            "id": 15,
             "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                    "calcs": [
-                        "lastNotNull"
-                    ],
-                    "fields": "",
-                    "values": false
+                "barRadius": 0,
+                "barWidth": 0.97,
+                "colorByField": "model_version",
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
                 },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
+                "orientation": "auto",
+                "showValue": "auto",
+                "stacking": "none",
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "single",
+                    "sort": "none"
+                },
+                "xField": "model_version",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
             },
             "pluginVersion": "11.5.2",
             "targets": [
                 {
-                    "datasource": {
-                        "type": "grafana-bigquery-datasource",
-                        "uid": "P0871A590F805E5CD"
-                    },
                     "editorMode": "code",
                     "format": 1,
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  AVG(CAST(is_correct AS INT64))*100 AS avg_prediction_accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\nWHERE model_version = '${model_version_A}'",
+                    "rawSql": "SELECT\n  model_version,\n  class_label,\n  SUM(example_count) AS count,\n  ROUND(SAFE_DIVIDE(SUM(example_count),\n        SUM(SUM(example_count)) OVER (PARTITION BY model_version)), 4) AS pct\nFROM dataset_distribution.class_distribution\nWHERE model_version IN ('v3_1', 'v3_2', 'v3_3', 'v3_4')\nGROUP BY model_version, class_label\nORDER BY model_version,class_label\n",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -106,8 +129,8 @@
                     }
                 }
             ],
-            "title": "Lifetime Prediction Accuracy - ${model_version_A}",
-            "type": "stat"
+            "title": "Panel Title",
+            "type": "barchart"
         },
         {
             "datasource": {
@@ -159,8 +182,8 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 12,
-                "x": 6,
+                "w": 11,
+                "x": 13,
                 "y": 0
             },
             "id": 4,
@@ -226,14 +249,34 @@
         },
         {
             "datasource": {
-                "default": true,
                 "type": "grafana-bigquery-datasource",
                 "uid": "P0871A590F805E5CD"
             },
             "fieldConfig": {
                 "defaults": {
                     "color": {
-                        "mode": "thresholds"
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "fillOpacity": 80,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 1,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
                     },
                     "mappings": [],
                     "thresholds": {
@@ -254,41 +297,43 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 6,
-                "x": 18,
-                "y": 0
+                "w": 13,
+                "x": 0,
+                "y": 8
             },
-            "id": 10,
+            "id": 14,
             "options": {
-                "colorMode": "value",
-                "graphMode": "area",
-                "justifyMode": "auto",
-                "orientation": "auto",
-                "percentChangeColorMode": "standard",
-                "reduceOptions": {
-                    "calcs": [
-                        "lastNotNull"
-                    ],
-                    "fields": "",
-                    "values": false
+                "barRadius": 0,
+                "barWidth": 0.97,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
                 },
-                "showPercentChange": false,
-                "textMode": "auto",
-                "wideLayout": true
+                "orientation": "auto",
+                "showValue": "auto",
+                "stacking": "none",
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "single",
+                    "sort": "none"
+                },
+                "xField": "model_version",
+                "xTickLabelRotation": 0,
+                "xTickLabelSpacing": 0
             },
             "pluginVersion": "11.5.2",
             "targets": [
                 {
-                    "datasource": {
-                        "type": "grafana-bigquery-datasource",
-                        "uid": "P0871A590F805E5CD"
-                    },
                     "editorMode": "code",
                     "format": 1,
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "SELECT\n  AVG(CAST(is_correct AS INT64))*100 AS avg_prediction_accuracy\nFROM\n  `dog_prediction_app.prediction_metrics`\nWHERE model_version = '${model_version_B}'",
+                    "rawSql": "WITH current_distribution AS (\n  SELECT\n    model_version,\n    class_label,\n    SUM(example_count) AS count\n  FROM dataset_distribution.class_distribution\n  GROUP BY model_version, class_label\n),\nbaseline_distribution AS (\n  SELECT\n    class_label,\n    SUM(example_count) AS baseline_count\n  FROM dataset_distribution.class_distribution\n  WHERE model_version = 'v3_1'\n  GROUP BY class_label\n),\nnormalized AS (\n  SELECT\n    c.model_version,\n    c.class_label,\n    SAFE_DIVIDE(c.count, total_c.total_count) AS p,\n    SAFE_DIVIDE(b.baseline_count, total_b.total_count) AS q\n  FROM current_distribution c\n  INNER JOIN baseline_distribution b\n    ON c.class_label = b.class_label\n  JOIN (\n    SELECT model_version, SUM(count) AS total_count\n    FROM current_distribution\n    GROUP BY model_version\n  ) total_c ON c.model_version = total_c.model_version\n  CROSS JOIN (\n    SELECT SUM(baseline_count) AS total_count\n    FROM baseline_distribution\n  ) total_b\n),\nkl_scores AS (\n  SELECT\n    model_version,\n    ROUND(SUM(p * LOG(SAFE_DIVIDE(p, q))), 6) AS kl_divergence\n  FROM normalized\n  WHERE p IS NOT NULL AND q IS NOT NULL AND p > 0 AND q > 0\n  GROUP BY model_version\n),\nrun_dates AS (\n  SELECT\n    model_version,\n    TIMESTAMP_TRUNC(MAX(run_timestamp), DAY) AS run_date\n  FROM dataset_distribution.class_distribution\n  GROUP BY model_version\n)\nSELECT\n  k.model_version,\n  k.kl_divergence,\n  r.run_date\nFROM kl_scores k\nJOIN run_dates r\n  ON k.model_version = r.model_version\nORDER BY model_version\n",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -309,8 +354,8 @@
                     }
                 }
             ],
-            "title": "Lifetime Prediction Accuracy - ${model_version_B}",
-            "type": "stat"
+            "title": "KL Distribution per Model",
+            "type": "barchart"
         },
         {
             "datasource": {
@@ -364,7 +409,7 @@
                 "h": 9,
                 "w": 24,
                 "x": 0,
-                "y": 8
+                "y": 16
             },
             "id": 7,
             "options": {
@@ -474,7 +519,7 @@
                 "h": 8,
                 "w": 24,
                 "x": 0,
-                "y": 17
+                "y": 25
             },
             "id": 12,
             "options": {
@@ -582,10 +627,10 @@
                 "overrides": []
             },
             "gridPos": {
-                "h": 10,
+                "h": 9,
                 "w": 24,
                 "x": 0,
-                "y": 25
+                "y": 33
             },
             "id": 11,
             "options": {
@@ -600,7 +645,7 @@
                     "showLegend": true
                 },
                 "orientation": "vertical",
-                "showValue": "auto",
+                "showValue": "always",
                 "stacking": "none",
                 "tooltip": {
                     "hideZeros": false,
@@ -619,7 +664,7 @@
                     "location": "",
                     "project": "creature-vision",
                     "rawQuery": true,
-                    "rawSql": "WITH latest_runs AS (\n  SELECT\n    model_version,\n    class_label,\n    label_id,\n    example_count,\n    run_timestamp,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM\n    `creature-vision.dataset_distribution.class_distribution`\n)\n\nSELECT\n  model_version,\n  class_label,\n  example_count\nFROM\n  latest_runs\nWHERE\n  row_num = 1\n  AND model_version = '${model_version_A}'\nORDER BY\n  example_count,\n  class_label\n",
+                    "rawSql": "WITH latest_runs AS (\n  SELECT\n    model_version,\n    class_label,\n    label_id,\n    example_count,\n    run_timestamp,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM\n    `creature-vision.dataset_distribution.class_distribution`\n)\n\nSELECT\n  model_version,\n  class_label,\n  example_count\nFROM\n  latest_runs\nWHERE\n  row_num = 1\n  AND model_version = '${model_version_A}'\nORDER BY\n  class_label\n",
                     "refId": "A",
                     "sql": {
                         "columns": [
@@ -657,7 +702,117 @@
                         "axisBorderShow": false,
                         "axisCenteredZero": false,
                         "axisColorMode": "text",
-                        "axisLabel": "Num Predictions",
+                        "axisLabel": "",
+                        "axisPlacement": "auto",
+                        "fillOpacity": 80,
+                        "gradientMode": "none",
+                        "hideFrom": {
+                            "legend": false,
+                            "tooltip": false,
+                            "viz": false
+                        },
+                        "lineWidth": 1,
+                        "scaleDistribution": {
+                            "type": "linear"
+                        },
+                        "thresholdsStyle": {
+                            "mode": "off"
+                        }
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "red",
+                                "value": 80
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 42
+            },
+            "id": 13,
+            "options": {
+                "barRadius": 0,
+                "barWidth": 0.97,
+                "fullHighlight": false,
+                "groupWidth": 0.7,
+                "legend": {
+                    "calcs": [],
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "orientation": "vertical",
+                "showValue": "always",
+                "stacking": "none",
+                "tooltip": {
+                    "hideZeros": false,
+                    "mode": "single",
+                    "sort": "none"
+                },
+                "xField": "class_label",
+                "xTickLabelRotation": -60,
+                "xTickLabelSpacing": 0
+            },
+            "pluginVersion": "11.5.2",
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "format": 1,
+                    "location": "",
+                    "project": "creature-vision",
+                    "rawQuery": true,
+                    "rawSql": "WITH latest_runs AS (\n  SELECT\n    model_version,\n    class_label,\n    label_id,\n    example_count,\n    run_timestamp,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM\n    `creature-vision.dataset_distribution.class_distribution`\n)\n\nSELECT\n  model_version,\n  class_label,\n  example_count\nFROM\n  latest_runs\nWHERE\n  row_num = 1\n  AND model_version = '${model_version_B}'\nORDER BY\n  class_label\n",
+                    "refId": "A",
+                    "sql": {
+                        "columns": [
+                            {
+                                "parameters": [],
+                                "type": "function"
+                            }
+                        ],
+                        "groupBy": [
+                            {
+                                "property": {
+                                    "type": "string"
+                                },
+                                "type": "groupBy"
+                            }
+                        ],
+                        "limit": 50
+                    }
+                }
+            ],
+            "title": "Dataset Distribution - ${model_version_B}",
+            "type": "barchart"
+        },
+        {
+            "datasource": {
+                "type": "grafana-bigquery-datasource",
+                "uid": "P0871A590F805E5CD"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "custom": {
+                        "axisBorderShow": false,
+                        "axisCenteredZero": false,
+                        "axisColorMode": "text",
+                        "axisLabel": "",
                         "axisPlacement": "left",
                         "fillOpacity": 80,
                         "gradientMode": "none",
@@ -695,7 +850,7 @@
                 "h": 9,
                 "w": 24,
                 "x": 0,
-                "y": 35
+                "y": 51
             },
             "id": 8,
             "options": {
@@ -771,116 +926,6 @@
                         "axisCenteredZero": false,
                         "axisColorMode": "text",
                         "axisLabel": "",
-                        "axisPlacement": "auto",
-                        "fillOpacity": 80,
-                        "gradientMode": "none",
-                        "hideFrom": {
-                            "legend": false,
-                            "tooltip": false,
-                            "viz": false
-                        },
-                        "lineWidth": 1,
-                        "scaleDistribution": {
-                            "type": "linear"
-                        },
-                        "thresholdsStyle": {
-                            "mode": "off"
-                        }
-                    },
-                    "mappings": [],
-                    "thresholds": {
-                        "mode": "absolute",
-                        "steps": [
-                            {
-                                "color": "green",
-                                "value": null
-                            },
-                            {
-                                "color": "red",
-                                "value": 80
-                            }
-                        ]
-                    }
-                },
-                "overrides": []
-            },
-            "gridPos": {
-                "h": 10,
-                "w": 24,
-                "x": 0,
-                "y": 44
-            },
-            "id": 13,
-            "options": {
-                "barRadius": 0,
-                "barWidth": 0.97,
-                "fullHighlight": false,
-                "groupWidth": 0.7,
-                "legend": {
-                    "calcs": [],
-                    "displayMode": "list",
-                    "placement": "bottom",
-                    "showLegend": true
-                },
-                "orientation": "vertical",
-                "showValue": "auto",
-                "stacking": "none",
-                "tooltip": {
-                    "hideZeros": false,
-                    "mode": "single",
-                    "sort": "none"
-                },
-                "xField": "class_label",
-                "xTickLabelRotation": -60,
-                "xTickLabelSpacing": 0
-            },
-            "pluginVersion": "11.5.2",
-            "targets": [
-                {
-                    "editorMode": "code",
-                    "format": 1,
-                    "location": "",
-                    "project": "creature-vision",
-                    "rawQuery": true,
-                    "rawSql": "WITH latest_runs AS (\n  SELECT\n    model_version,\n    class_label,\n    label_id,\n    example_count,\n    run_timestamp,\n    ROW_NUMBER() OVER (\n      PARTITION BY model_version, class_label\n      ORDER BY run_timestamp DESC\n    ) AS row_num\n  FROM\n    `creature-vision.dataset_distribution.class_distribution`\n)\n\nSELECT\n  model_version,\n  class_label,\n  example_count\nFROM\n  latest_runs\nWHERE\n  row_num = 1\n  AND model_version = '${model_version_B}'\nORDER BY\n  example_count,\n  class_label\n",
-                    "refId": "A",
-                    "sql": {
-                        "columns": [
-                            {
-                                "parameters": [],
-                                "type": "function"
-                            }
-                        ],
-                        "groupBy": [
-                            {
-                                "property": {
-                                    "type": "string"
-                                },
-                                "type": "groupBy"
-                            }
-                        ],
-                        "limit": 50
-                    }
-                }
-            ],
-            "title": "Dataset Distribution - ${model_version_B}",
-            "type": "barchart"
-        },
-        {
-            "datasource": {
-                "type": "grafana-bigquery-datasource",
-                "uid": "P0871A590F805E5CD"
-            },
-            "fieldConfig": {
-                "defaults": {
-                    "color": {
-                        "mode": "palette-classic"
-                    },
-                    "custom": {
-                        "axisBorderShow": false,
-                        "axisCenteredZero": false,
-                        "axisColorMode": "text",
-                        "axisLabel": "Num Predictions",
                         "axisPlacement": "left",
                         "fillOpacity": 80,
                         "gradientMode": "none",
@@ -918,7 +963,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 54
+                "y": 60
             },
             "id": 9,
             "options": {
@@ -1045,9 +1090,9 @@
             },
             "gridPos": {
                 "h": 8,
-                "w": 13,
-                "x": 11,
-                "y": 64
+                "w": 24,
+                "x": 0,
+                "y": 70
             },
             "id": 1,
             "options": {
@@ -1137,7 +1182,8 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green"
+                                "color": "green",
+                                "value": null
                             }
                         ]
                     }
@@ -1148,7 +1194,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 72
+                "y": 78
             },
             "id": 5,
             "options": {
@@ -1242,7 +1288,8 @@
                         "mode": "absolute",
                         "steps": [
                             {
-                                "color": "green"
+                                "color": "green",
+                                "value": null
                             }
                         ]
                     }
@@ -1253,7 +1300,7 @@
                 "h": 10,
                 "w": 24,
                 "x": 0,
-                "y": 82
+                "y": 88
             },
             "id": 6,
             "options": {
@@ -1379,11 +1426,13 @@
                 "current": {
                     "text": [
                         "segugio italian",
-                        "mudhol indian"
+                        "mudhol indian",
+                        "spitz indian"
                     ],
                     "value": [
                         "segugio italian",
-                        "mudhol indian"
+                        "mudhol indian",
+                        "spitz indian"
                     ]
                 },
                 "definition": "",
@@ -1426,8 +1475,8 @@
             {
                 "allowCustomValue": false,
                 "current": {
-                    "text": "v3_4",
-                    "value": "v3_4"
+                    "text": "v3_1",
+                    "value": "v3_1"
                 },
                 "definition": "",
                 "name": "model_version_A",
@@ -1465,8 +1514,8 @@
             {
                 "allowCustomValue": false,
                 "current": {
-                    "text": "v3_3",
-                    "value": "v3_3"
+                    "text": "v3_2",
+                    "value": "v3_2"
                 },
                 "definition": "",
                 "name": "model_version_B",
@@ -1511,6 +1560,6 @@
     "timezone": "browser",
     "title": "Creature Vision App",
     "uid": "ce0rkbkezvda8c",
-    "version": 103,
+    "version": 116,
     "weekStart": ""
 }
