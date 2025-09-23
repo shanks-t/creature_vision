@@ -104,7 +104,7 @@ def create_training_dataset(
     augment_fn = get_augmentation_fn()
     train_ds = (
         train_ds.map(augment_fn, num_parallel_calls=tf.data.AUTOTUNE)
-        .shuffle(buffer_size=1000)
+        .shuffle(buffer_size=3000)
         .batch(batch_size)
         .prefetch(tf.data.AUTOTUNE)
     )
