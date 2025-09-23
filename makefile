@@ -127,14 +127,26 @@ test-inference:
 	  https://dog-predictor-284159624099.us-east1.run.app/predict \
 	  
 test-train: cp-train-pkg
-	@echo "Submitting custom training job to test new training code"
+	@echo "Submitting custom training job to test new training code for version=${MODEL_VERSION},--previous_model_version=${PREVIOUS_VERSION}"
 	gcloud ai custom-jobs create \
 	  --region=us-east1 \
-	  --display-name=creture-vision-training \
+	  --display-name=creature-vision-training \
 	  --python-package-uris=gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz \
-	  --args=--version=v-3_2 \
+	  --args=--version=${MODEL_VERSION},--previous_model_version=${PREVIOUS_VERSION} \
 	  --worker-pool-spec=machine-type=e2-standard-4,replica-count=1,executor-image-uri=us-docker.pkg.dev/vertex-ai/training/tf-cpu.2-17.py310:latest,python-module=creature_vision_training.main \
 	  --service-account=kubeflow-pipeline-sa@creature-vision.iam.gserviceaccount.com
+
+test-train-gpu: cp-train-pkg
+	@echo "Submitting GPU-ENABLED custom training job to test new training code for version=${MODEL_VERSION},--previous_model_version=${PREVIOUS_VERSION}"
+	gcloud ai custom-jobs create \
+	--region=us-east1 \
+	--display-name=creature-vision-training-gpu \
+	--python-package-uris=gs://creture-vision-ml-artifacts/python_packages/creature_vision_training-0.1.tar.gz \
+	--args=--version=${MODEL_VERSION},--previous_model_version=${PREVIOUS_VERSION} \
+	--worker-pool-spec=machine-type=n1-standard-4,replica-count=1,accelerator-type=NVIDIA_TESLA_T4,accelerator-count=1,executor-image-uri=us-docker.pkg.dev/vertex-ai/training/tf-gpu.2-17.py310:latest,python-module=creature_vision_training.main,preemptible=true \
+	--service-account=kubeflow-pipeline-sa@creature-vision.iam.gserviceaccount.com \
+	--enable-web-access \
+
 
 cp-train-pkg:
 	cd src/training && \
