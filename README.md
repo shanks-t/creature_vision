@@ -1,131 +1,128 @@
-# Creature Vision: Continuous Retraining ML Pipeline
+# Creature Vision
 
-This project implements a **continual learning pipeline** for dog breed classification using **MobileNetV3-Small**. The system employs **automated data collection, preprocessing, training, and deployment**, ensuring that the model continuously improves as new data is accumulated.
+Continuous retraining pipeline for dog breed classification with TensorFlow,
+Apache Beam/Dataflow, Vertex AI, Cloud Run, BigQuery, and Grafana.
 
-## **Overview**
+The project collects live dog images, runs inference, stores prediction results,
+builds TFRecords from accumulated examples, trains a new MobileNetV3-Small model,
+and redeploys the selected model version through a Kubeflow/Vertex AI pipeline.
 
-Creature Vision fetches dog images from a **free API**, processes them through an **inference service**, logs **accuracy and latency metrics**, and stores images for **future training**. The system then preprocesses the data, retrains the model on new data, and redeploys it, completing a **self-improving ML pipeline**.
-
-## **Demo Videos**
-- [Overview](https://www.youtube.com/watch?v=NxDV6e29O94)
-- [Champion/Challenger](https://youtu.be/2J20L-5yWIk)
-- [Kubelfow and ML Lifecycle](https://youtu.be/_AHTLu679sg)
-- [Data Distribution Monitoring, KL Divergence](https://www.youtube.com/watch?v=FLaOxPyXO6s)
-
-## **Key Features**
-
-- **Continuous Learning**: The model is automatically fine-tuned as new labeled data accumulates.
-- **Containerized Deployment**: All services (Inference, Preprocessing, Training) are **Dockerized** and deployed in **Cloud Run**.
-- **Data-Driven Decision Making**: Metrics (accuracy, latency) are stored in **BigQuery** for monitoring.
-- **Scalable Data Processing**: Uses **Apache Beam + Dataflow** to preprocess images into **TFRecords**.
-- **Automated Training & Deployment**: **Kubeflow Pipelines + Vertex AI** orchestrate **continual model updates**.
-
-## **Architecture**
+## Architecture
 
 ```mermaid
-graph TD;
-    subgraph Data Ingestion
-        A[**<b>Inference Service</b>**] -->|Fetches image| B[**<b>Free Dog Image API</b>**]
-        A -->|Logs predictions| C[**<b>BigQuery Metrics</b>**]
-        A -->|Stores images & labels| D[**<b>Raw Data - GCS Bucket</b>**]
-    end
-
-    subgraph Preprocessing
-        D -->|Triggers Dataflow Job| E[**<b>Preprocessing Service</b>**]
-        E -->|Transforms images & labels| F[**<b>TFRecords - Processed GCS Folder</b>**]
-    end
-
-    subgraph Training
-        F -->|Feeds TFRecords| G[**<b>Training Service</b>**]
-        G -->|Retrains model: MobileNetV3-Small| H[**<b>New Model Version - GCS</b>**]
-        G -->|Logs metrics| I[**<b>TensorBoard & Vertex AI Experiments</b>**]
-    end
-
-    subgraph Deployment
-        H -->|Triggers redeployment| J[**<b>Inference Service - Updated</b>**]
-    end
-
-    subgraph Orchestration
-        K[**<b>Kubeflow + Vertex AI Pipelines</b>**] -->|Manages Workflow| A
-        K -->|Manages Workflow| E
-        K -->|Manages Workflow| G
-        K -->|Deploys Model| J
-    end
-
-    subgraph Infrastructure
-        L[**<b>All Services Containerized with Docker</b>**]
-    end
-
-    style A fill:#ffeb99,stroke:#333,stroke-width:2px,font-weight:bold,color:#000;
-    style J fill:#ffeb99,stroke:#333,stroke-width:2px,font-weight:bold,color:#000;
-    style K fill:#99ccff,stroke:#333,stroke-width:2px,font-weight:bold,color:#000;
-    style L fill:#ff9999,stroke:#333,stroke-width:2px,font-weight:bold,color:#000;
+flowchart TD
+    dog_api["Dog image API"] --> inference["Cloud Run inference service"]
+    inference --> bq["BigQuery prediction metrics"]
+    inference --> raw_gcs["GCS raw images + labels"]
+    raw_gcs --> dataflow["Apache Beam / Dataflow preprocessing"]
+    dataflow --> tfrecords["GCS TFRecords + label metadata"]
+    tfrecords --> training["Vertex AI training job"]
+    training --> model_gcs["GCS model artifacts"]
+    bq --> trigger["Champion/challenger trigger"]
+    model_gcs --> trigger
+    trigger --> pipeline["Vertex AI / Kubeflow pipeline"]
+    pipeline --> inference
+    bq --> grafana["Grafana dashboard"]
 ```
 
-## **Workflow**
+## What This Shows
 
-1. **Inference Service** fetches images from the **Dog API** and logs accuracy & latency metrics in **BigQuery**.
-2. It also saves the **raw images & labels** to **Cloud Storage**.
-3. **Dataflow Preprocessing** converts raw images into **TFRecords**.
-4. **Training Service** loads TFRecords and **re-trains the MobileNetV3-Small model**.
-5. Training logs are stored in **Vertex AI Experiments & TensorBoard**.
-6. The **new model version** is stored in **GCS**.
-7. **Kubeflow Pipelines** redeploy the **Inference Service** with the **updated model**.
-8. The cycle repeats, continuously improving model accuracy over time.
+- Production-shaped ML workflow: collection, preprocessing, training, deployment,
+  metrics, and model promotion.
+- Service boundaries for inference, preprocessing, training, and orchestration.
+- GCP infrastructure and deployment assets for Cloud Run, Dataflow, Vertex AI,
+  BigQuery, Grafana, and Terraform.
+- Tests around the brittle parts of the code: model-version parsing, label matching,
+  and Beam output formatting.
 
-## **Technology Stack**
+## Repository Layout
 
-| Component           | Service Used                      |
-|--------------------|--------------------------------|
-| **Inference**      | Cloud Run + MobileNetV3-Small |
-| **Preprocessing**  | Apache Beam + Dataflow        |
-| **Training**       | Vertex AI Training            |
-| **Storage**        | Cloud Storage (GCS)           |
-| **Monitoring**     | BigQuery + TensorBoard        |
-| **Orchestration**  | Kubeflow Pipelines + Vertex AI Pipelines |
-| **Containerization** | Docker + Artifact Registry  |
+| Path | Purpose |
+| --- | --- |
+| `src/inference` | Flask inference service that fetches images, predicts labels, stores examples, and logs metrics. |
+| `src/preprocessing` | Apache Beam pipeline that converts stored examples into TFRecords and class distribution metrics. |
+| `src/training` | TensorFlow MobileNetV3 training package for Vertex AI custom jobs. |
+| `src/trigger` | Cloud Function entry point for champion/challenger orchestration. |
+| `src/kubeflow` | Vertex AI / Kubeflow pipeline compiler and deployment components. |
+| `docker` | Service Dockerfiles and local compose files. |
+| `infra` | Terraform resources for supporting GCP infrastructure. |
+| `tests` | Focused unit tests for maintained Python modules. |
 
-## **Getting Started**
+## Local Development
 
-### **Prerequisites**
-- Google Cloud SDK installed and authenticated
-- Docker installed
-- Kubeflow Pipelines setup on GCP
+This repo uses `uv` for Python dependency management.
 
-### **Setup Instructions**
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/your-repo/creature-vision.git
-   cd creature-vision
-   ```
-2. Build and push images for Inference and Preprocessing services
+```sh
+uv sync
+make test
+make lint
+```
 
-3. Compile and deploy the kubeflow pipeline
+Useful commands:
 
-4. Create Cloud function trigger with kubeflow .json and invoke the CF
+```sh
+make run-local SERVICE=inference VERSION=v3_0
+make run-local SERVICE=preprocessing VERSION=v3_5
+make run-training MODEL_VERSION=v3_5 PREVIOUS_VERSION=v3_4
+make run-monitoring
+```
 
-## **Monitoring & Visualization**
+The ML/runtime dependency set is intentionally heavy because it includes
+TensorFlow, Apache Beam, Vertex AI, and Kubeflow tooling.
 
-- **BigQuery** stores model accuracy, latency, and retraining metrics.
-- **Grafana** visualizes BigQuery metrics:
-  ```sh
-  docker-compose up grafana
-  ```
-- **TensorBoard** logs training performance:
-  ```sh
-  tensorboard --logdir=gs://your-tensorboard-logs/
-  ```
+## Configuration
 
-![Model Accuracy Visualization](./docs/grafana.png)
+Most runtime settings can be overridden with environment variables:
 
-## **Fine-Tuning & Continuous Learning**
+| Variable | Default |
+| --- | --- |
+| `GOOGLE_CLOUD_PROJECT` | `creature-vision` |
+| `CLOUD_LOCATION` | `us-east1` for preprocessing, `us-central1` for training |
+| `MODEL_VERSION` | Required by inference |
+| `MODEL_BUCKET` | `tf_models_cv` |
+| `DATA_BUCKET_NAME` / `TRAINING_BUCKET` | `creature-vision-training-set` |
+| `DATAFLOW_BUCKET_NAME` | `dataflow-use1` |
+| `BQ_METRICS_DATASET` | `dog_prediction_app` |
+| `BQ_METRICS_TABLE` | `prediction_metrics` |
 
-- **Model is retrained only when new data volume surpasses a threshold**.
-- **Fine-tuning follows best practices for transfer learning**:
-  - Base Model: **MobileNetV3-Small**
-  - Optimizer: **Adam with cosine decay learning rate**
-  - Dataset Augmentations: **Random rotation, horizontal flip, brightness adjustments**
+Local commands that touch GCP require authenticated Application Default
+Credentials:
 
-### **Reference**
-- [TensorFlow Fine-Tuning Guide](https://www.tensorflow.org/tutorials/images/transfer_learning)
+```sh
+gcloud auth application-default login
+```
 
+## Deployment Flow
+
+1. Build and push service images with `make build-push SERVICE=<service> VERSION=<tag>`.
+2. Build the Dataflow Flex Template with `make create-df-template VERSION=<tag>`.
+3. Compile and upload the Vertex AI pipeline with `make compile-pipeline`.
+4. Deploy the trigger Cloud Function with `make deploy-pipeline-cf`.
+5. Invoke the trigger with `make test-pipeline-cf USE_CACHE=false`.
+
+## Monitoring
+
+Prediction metrics and class distribution metrics are written to BigQuery.
+Grafana provisioning lives under `docker/inference/monitoring`.
+
+```sh
+make run-monitoring
+```
+
+![Grafana dashboard](./docs/grafana.png)
+
+## Demo Videos
+
+- [Overview](https://www.youtube.com/watch?v=NxDV6e29O94)
+- [Champion/challenger](https://youtu.be/2J20L-5yWIk)
+- [Kubeflow and ML lifecycle](https://youtu.be/_AHTLu679sg)
+- [Data distribution monitoring, KL divergence](https://www.youtube.com/watch?v=FLaOxPyXO6s)
+
+## Current Limits
+
+- The Docker service images still keep service-local `requirements.txt` files for
+  existing Cloud Run/Dataflow builds; the root development workflow is managed by
+  `uv`.
+- Notebooks are exploratory and are not part of the lint/test gate.
+- GCP resource names default to the original project and should be overridden for
+  another environment.

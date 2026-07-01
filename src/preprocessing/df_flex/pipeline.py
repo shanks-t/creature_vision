@@ -1,21 +1,41 @@
 # Standard Library Imports
-import os
 import io
 import json
-from datetime import datetime
+import os
 import random
+import re
+from datetime import datetime
 
 # Third-Party Imports
 import apache_beam as beam
-import tensorflow as tf
 import numpy as np
-from PIL import Image
+import tensorflow as tf
 from google.cloud import storage
+from PIL import Image
 
 # Local/Project-Specific Imports
-from df_flex.logging_utils import setup_logger, timer, log_execution_time
+from df_flex.logging_utils import log_execution_time, setup_logger, timer
 
 logger = setup_logger("pipeline")
+MODEL_VERSION_RE = re.compile(r"^v(?P<major>\d+)_(?P<minor>\d+)$")
+
+
+def parse_model_version(version: str) -> tuple[int, int] | None:
+    match = MODEL_VERSION_RE.match(version)
+    if not match:
+        return None
+    return int(match.group("major")), int(match.group("minor"))
+
+
+def get_previous_version(version: str) -> str | None:
+    parsed = parse_model_version(version)
+    if not parsed:
+        return None
+
+    major, minor = parsed
+    if minor <= 0:
+        return None
+    return f"v{major}_{minor - 1}"
 
 
 class FormatLabelStatsForBigQuery(beam.DoFn):
@@ -44,60 +64,61 @@ class FormatLabelStatsForBigQuery(beam.DoFn):
 
 
 class GCSImagePathProvider(beam.PTransform):
-    """Provides image paths from GCS for streaming processing."""
+    """Provides image paths from GCS for streaming processing"""
 
-    def __init__(self, bucket_name, version, random_seed=None):
+    def __init__(self, bucket_name, version, random_seed=None, max_files=None):
         super().__init__()
         self.bucket_name = bucket_name
         self.version = version
         self.random_seed = random_seed
+        self.max_files = max_files
 
     def expand(self, pcoll):
         def list_image_paths():
             if self.random_seed is not None:
                 random.seed(self.random_seed)
 
-            client = storage.Client(project="creature-vision")
+            client = storage.Client(project=os.getenv("GOOGLE_CLOUD_PROJECT"))
             bucket = client.bucket(self.bucket_name)
+            all_version_dirs = tf.io.gfile.listdir(f"gs://{self.bucket_name}/")
+            parsed_version = parse_model_version(self.version)
 
-            version_prefix, version_number_str = self.version.split("_")
-            version_number = int(version_number_str)
-
-            all_dirs = tf.io.gfile.listdir(f"gs://{self.bucket_name}/")
-
-            # Normalize to just directory names (e.g., "v3_2", "v3_3")
-            version_dirs = [
-                d.rstrip("/") for d in all_dirs if d.startswith(version_prefix + "_")
-            ]
-
-            all_version_paths = []
+            current_paths = []
             current_prefix = f"{self.version}/incorrect_predictions/"
             for blob in bucket.list_blobs(prefix=current_prefix):
                 if blob.name.endswith(".jpg"):
-                    all_version_paths.append(blob.name)
+                    current_paths.append(blob.name)
 
-            sampled_previous_paths = []
-            for version_dir in version_dirs:
-                try:
-                    version_num = int(version_dir.split("_")[1])
-                except (IndexError, ValueError):
-                    continue
-
-                if version_num >= version_number:
-                    continue  # Skip current and future versions
-
-                prefix = f"{version_dir}/incorrect_predictions/"
-                prev_version_jpgs = [
-                    blob.name
-                    for blob in bucket.list_blobs(prefix=prefix)
-                    if blob.name.endswith(".jpg")
+            eligible_versions = []
+            if parsed_version:
+                major, minor = parsed_version
+                eligible_versions = [
+                    version_dir
+                    for version_dir in (v.rstrip("/") for v in all_version_dirs)
+                    if (parsed := parse_model_version(version_dir))
+                    and parsed[0] == major
+                    and parsed[1] < minor
                 ]
-                sample_size = int(len(prev_version_jpgs) * 0.2)
-                if sample_size > 0:
-                    sampled = random.sample(prev_version_jpgs, sample_size)
-                    sampled_previous_paths.extend(sampled)
 
-            return all_version_paths + sampled_previous_paths
+            all_prev_jpgs = []
+            for version in eligible_versions:
+                prefix = f"{version}/incorrect_predictions/"
+                blobs = bucket.list_blobs(prefix=prefix)
+                all_prev_jpgs.extend(
+                    [blob.name for blob in blobs if blob.name.endswith(".jpg")]
+                )
+
+            num_to_sample = int(len(all_prev_jpgs) * 0.2)
+            sampled_prev_paths = (
+                random.sample(all_prev_jpgs, num_to_sample) if num_to_sample > 0 else []
+            )
+
+            combined = current_paths + sampled_prev_paths
+            random.shuffle(combined)
+            if self.max_files:
+                combined = combined[: self.max_files]
+
+            return combined
 
         return pcoll | beam.Create(list_image_paths())
 
@@ -110,9 +131,16 @@ class ProcessImageAndLabel(beam.DoFn):
         self.label_map = label_map
         self.client = None
         self.bucket = None
+        self.missing_label = beam.metrics.Metrics.counter(
+            self.__class__, "missing_label"
+        )
+        self.unknown_label = beam.metrics.Metrics.counter(
+            self.__class__, "unknown_label"
+        )
+        self.failed = beam.metrics.Metrics.counter(self.__class__, "failed")
 
     def setup(self):
-        self.client = storage.Client(project="creature-vision")
+        self.client = storage.Client(project=os.getenv("GOOGLE_CLOUD_PROJECT"))
         self.bucket = self.client.bucket(self.bucket_name)
 
     def process(self, image_path):
@@ -126,6 +154,7 @@ class ProcessImageAndLabel(beam.DoFn):
 
             # Check if the label blob exists, and if not, skip this entry
             if not label_blob.exists():
+                self.missing_label.inc()
                 return  # Label missing, skip this image
 
             image_bytes = image_blob.download_as_bytes()
@@ -135,9 +164,7 @@ class ProcessImageAndLabel(beam.DoFn):
             label_id = self.label_map.get(class_name)
 
             if label_id is None:
-                # Returning [] explicitly tells Beam this function ran successfully but produced no output.
-                # If None is returned, Beam ignores it—no error, no warning.
-                # This leads to silent data loss, as those elements simply disappear from the pipeline.
+                self.unknown_label.inc()
                 return
 
             image_array = np.array(Image.open(io.BytesIO(image_bytes)).convert("RGB"))
@@ -165,6 +192,7 @@ class ProcessImageAndLabel(beam.DoFn):
             yield beam.pvalue.TaggedOutput("label_stats", (class_name, label_id))
 
         except Exception as e:
+            self.failed.inc()
             logger.error(f"Error processing {image_path}: {str(e)}")
 
         return  # Return nothing
@@ -191,6 +219,7 @@ class ProcessDataPipeline:
         use_dataflow: bool = True,
         region: str = "us-east1",
         random_seed: int = 0,
+        max_files: int | None = None,
         max_num_workers: int = 2,
         number_of_worker_harness_threads: int = 4,
         machine_type: str = "n1-standard-2",
@@ -200,7 +229,7 @@ class ProcessDataPipeline:
         self.logger.info("Updating label map before starting the pipeline...")
 
         # load the updated label map
-        client = storage.Client(project="creature-vision")
+        client = storage.Client(project=self.project_id)
         bucket = client.bucket(self.dataset_bucket_name)
         blob = bucket.blob("processed/metadata/label_map.json")
         label_map = json.loads(blob.download_as_text())
@@ -216,11 +245,12 @@ class ProcessDataPipeline:
         }
 
         if use_dataflow:
+            job_name = f"creature-vision-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
             pipeline_options.update(
                 {
                     "runner": "DataflowRunner",
                     "region": region,
-                    "job_name": f"creature-vision-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
+                    "job_name": job_name,
                     "max_num_workers": max_num_workers,
                     "disk_size_gb": 30,
                     "experiments": [
@@ -229,7 +259,9 @@ class ProcessDataPipeline:
                         "flexrs_goal=COST_OPTIMIZED",
                     ],
                     "machine_type": machine_type,
-                    "number_of_worker_harness_threads": number_of_worker_harness_threads,
+                    "number_of_worker_harness_threads": (
+                        number_of_worker_harness_threads
+                    ),
                     "autoscaling_algorithm": "THROUGHPUT_BASED",
                     "worker_disk_type": "pd-standard",
                     "save_main_session": True,
@@ -251,6 +283,7 @@ class ProcessDataPipeline:
                         self.dataset_bucket_name,
                         version,
                         random_seed=random_seed,
+                        max_files=max_files,
                     )
                     | "ProcessImagesAndLabels"
                     >> beam.ParDo(
@@ -275,10 +308,13 @@ class ProcessDataPipeline:
                     >> beam.Map(lambda count: json.dumps({"dataset_size": count}))
                 )
 
+                metadata_path = (
+                    f"gs://{self.dataset_bucket_name}/processed/{version}/metadata"
+                )
                 _ = example_count | "WriteMetadataFile" >> beam.io.WriteToText(
-                    file_path_prefix=f"gs://{self.dataset_bucket_name}/processed/{version}/metadata",
+                    file_path_prefix=metadata_path,
                     file_name_suffix=".json",
-                    shard_name_template="",  # optional: don't add shard suffix
+                    shard_name_template="",
                 )
 
                 # add class distribution stats to BigQuery

@@ -27,8 +27,8 @@ def save_label_map(bucket_name, label_map):
 
 
 def extract_label(file_path):
-    """Extract label from file path (e.g., 'incorrect_predictions/whippet_12345_labels.json' → 'whippet')"""
-    return file_path.split('/')[-1].split('_')[0]  # Extract first word in filename
+    """Extract label from a path like incorrect_predictions/whippet_123_labels.json."""
+    return file_path.split("/")[-1].split("_")[0]
 
 
 def get_all_label_files(bucket_name):
@@ -40,7 +40,8 @@ def get_all_label_files(bucket_name):
     for prefix in LABEL_PREFIXES:
         blobs = bucket.list_blobs(prefix=prefix)
         label_files.extend(
-            [blob.name for blob in blobs if blob.name.endswith(LABEL_FILE_SUFFIX)])
+            [blob.name for blob in blobs if blob.name.endswith(LABEL_FILE_SUFFIX)]
+        )
 
     return label_files
 

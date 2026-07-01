@@ -1,7 +1,7 @@
 import logging
 import time
-from functools import wraps
 from contextlib import contextmanager
+from functools import wraps
 
 
 def setup_logger(name):

@@ -43,10 +43,13 @@ GCP_PROJECT ?= $(PROJECT_ID)
 GCP_REGION ?= $(REGION)
 TEMPLATE_IMAGE ?= ${ARTIFACT_REGISTRY}/${PROJECT_ID}/${PREPROCESSING_APP}/preprocessing:${VERSION}
 
-.PHONY: help build run-local build-cloud push-ar push-gcr auth-registry configure-kubectl get-deps test-template
+.PHONY: help sync test lint build run-local build-cloud push-ar push-gcr auth-registry configure-kubectl get-deps test-template
 
 help:
 	@echo "Available commands:"
+	@echo "  make sync                                    - Install project dependencies with uv"
+	@echo "  make test                                    - Run tests with uv"
+	@echo "  make lint                                    - Run ruff with uv"
 	@echo "  make build SERVICE=[inference|training|preprocessing]     - Build docker image locally"
 	@echo "  make run-local SERVICE=[inference|training|preprocessing] - Run service locally"
 	@echo "  make build-cloud SERVICE=[inference|training|preprocessing] - Build for cloud deployment"
@@ -57,10 +60,18 @@ help:
 	@echo "  make get-deps SERVICE=[inference|training|preprocessing]  - Generate requirements.txt for service"
 	@echo "  make test-template                         - Test the integrity of the Flex Container"
 
+sync:
+	uv sync
+
+test:
+	uv run pytest
+
+lint:
+	uv run ruff check src/inference src/preprocessing src/training tests
+
 get-deps:
 	@echo "Generating requirements.txt for $(SERVICE) service..."
-	pip install pipreqs
-	pipreqs ./src/$(SERVICE) --savepath ./src/$(SERVICE)/requirements.txt --use-local --force
+	uvx pipreqs ./src/$(SERVICE) --savepath ./src/$(SERVICE)/requirements.txt --use-local --force
 
 build-push: auth-registry
 	docker buildx build -f docker/$(SERVICE)/Dockerfile src/$(SERVICE)/ \
@@ -105,7 +116,7 @@ run-monitoring:
 	docker compose -f docker/inference/docker-compose.grafana.yaml up --build
 
 run-training:
-	PYTHONPATH=src/training python -m creature_vision_training.main --version=$(MODEL_VERSION) --previous_model_version=$(PREVIOUS_VERSION)
+	uv run creature-vision-training --version=$(MODEL_VERSION) --previous_model_version=$(PREVIOUS_VERSION)
 
 
 test-template: ## Test the Integrity of the Flex Container
@@ -167,7 +178,7 @@ deploy-pipeline-cf: compile-pipeline
 
 compile-pipeline:
 	@echo "📦 Compiling Kubeflow pipeline..."
-	python src/kubeflow/compile_pipeline.py
+	uv run python src/kubeflow/compile_pipeline.py
 	@echo "🚀 Uploading pipeline JSON to GCS..."
 	gsutil cp creature_vision_pipeline.json gs://creature-vision-pipeline-artifacts/kubeflow-templates/
 	@echo "✅ Pipeline compilation and upload complete."
@@ -201,4 +212,3 @@ reset-challenger:
 	'  }' \
 	'}' > model_versions.json && \
 	gsutil cp model_versions.json gs://ml_challenger_state/model_versions.json
-

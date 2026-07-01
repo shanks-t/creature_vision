@@ -1,30 +1,24 @@
 import argparse
 import datetime
 import os
-import sys
-
-from google.cloud import aiplatform
 
 import tensorflow as tf
+from google.cloud import aiplatform
 from tensorflow.keras import mixed_precision
 
-from creature_vision_training.model import (
-    setup_model,
-    run_training,
-    load_or_create_model,
-    save_model,
-    compute_class_weight,
-)
 from creature_vision_training.dataset import create_training_dataset
-
-# Add GCS module path
-sys.path.append("/gcs/creture-vision-ml-artifacts/src/training")
+from creature_vision_training.model import (
+    compute_class_weight,
+    load_or_create_model,
+    run_training,
+    save_model,
+    setup_model,
+)
 
 
 def parse_args():
     """Parse command-line arguments for training."""
 
-    print(f"Raw sys.argv received: {sys.argv}")
     parser = argparse.ArgumentParser(
         description="Train a machine learning model and save it to GCS."
     )
@@ -50,9 +44,6 @@ def main():
     LOCATION = os.getenv("CLOUD_LOCATION", "us-east1")
     MODEL_BUCKET = os.getenv("MODEL_BUCKET", "tf_models_cv")
     STAGING_BUCKET = os.getenv("STAGING_BUCKET", "creture-vision-ml-artifacts")
-    # AIP_TENSORBOARD_LOG_DIR = os.getenv(
-    #     "AIP_TENSORBOARD_LOG_DIR", "gs://creture-vision-ml-artifacts/local"
-    # )
     NEW_VERSION = args.version
     if args.previous_model_version == "None":
         args.previous_model_version = None

@@ -1,12 +1,13 @@
-import os
 import json
+import logging
+import os
+
 import tensorflow as tf
 from google.cloud import storage
-import logging
 
 
 def load_model(
-    version: str, bucket_name: str = "tf_models_cv"
+    version: str, bucket_name: str | None = None
 ) -> tuple[tf.keras.Model, dict]:
     """
     Loads model and metadata from a GCS bucket.
@@ -22,10 +23,16 @@ def load_model(
     model_dir = "./model"
     os.makedirs(model_dir, exist_ok=True)
 
+    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "creature-vision")
+    bucket_name = bucket_name or os.environ.get("MODEL_BUCKET", "tf_models_cv")
+    label_bucket_name = os.environ.get(
+        "DATA_BUCKET_NAME", "creature-vision-training-set"
+    )
+
     # Set up the GCS client.
-    storage_client = storage.Client(project="creature-vision")
+    storage_client = storage.Client(project=project_id)
     bucket = storage_client.bucket(bucket_name)
-    label_bucket = storage_client.bucket("creature-vision-training-set")
+    label_bucket = storage_client.bucket(label_bucket_name)
 
     # Define local paths for the model and metadata.
     model_file = f"{version}.keras"
@@ -37,7 +44,11 @@ def load_model(
         # Download the model file from GCS.
         model_blob = bucket.blob(f"{version}/{model_file}")
         logging.info(
-            f"Downloading model from gs://{bucket_name}/{version}/{model_file} to {model_path}."
+            "Downloading model from gs://%s/%s/%s to %s.",
+            bucket_name,
+            version,
+            model_file,
+            model_path,
         )
         model_blob.download_to_filename(model_path)
     except Exception as e:
@@ -48,7 +59,10 @@ def load_model(
         # Download the metadata file from GCS.
         metadata_blob = label_bucket.blob(f"processed/metadata/{metadata_file}")
         logging.info(
-            f"Downloading metadata from gs://{label_bucket}processed/metadata/{metadata_file} to {metadata_path}."
+            "Downloading metadata from gs://%s/processed/metadata/%s to %s.",
+            label_bucket_name,
+            metadata_file,
+            metadata_path,
         )
         metadata_blob.download_to_filename(metadata_path)
     except Exception as e:
@@ -57,7 +71,7 @@ def load_model(
 
     # Load metadata from the JSON file.
     try:
-        with open(metadata_path, "r") as f:
+        with open(metadata_path) as f:
             metadata = json.load(f)
     except Exception as e:
         logging.error(f"Error loading metadata from {metadata_path}: {e}")

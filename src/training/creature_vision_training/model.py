@@ -1,17 +1,13 @@
-import re
 import os
+import re
 from collections import Counter
-from io import StringIO
 from datetime import datetime
+from io import StringIO
 
 import tensorflow as tf
-from google.cloud import aiplatform
 
 
-def setup_model(
-    model: tf.keras.Model,
-    base_learning_rate: float = 1e-3,
-) -> tuple[tf.keras.Model, list, list]:
+def setup_model(model: tf.keras.Model) -> tuple[tf.keras.Model, list, list]:
     """Configures model and Vertex AI experiment without starting run"""
 
     # Define metrics
@@ -88,7 +84,7 @@ def run_training(
 def create_model(
     num_classes: int, input_shape: tuple = (224, 224, 3)
 ) -> tf.keras.Model:
-    """Creates a MobileNetV3-Small model with preprocessing, augmentation and regularization"""
+    """Creates a MobileNetV3-Small classifier."""
     inputs = tf.keras.Input(shape=input_shape)
 
     # Add preprocessing layer
@@ -134,11 +130,11 @@ def parse_model_version(version_str: str) -> tuple:
     return int(match.group(1)), int(match.group(2))
 
 
-def load_or_create_model(label_map: dict, prev_version: str) -> tf.keras.Model:
+def load_or_create_model(label_map: dict, prev_version: str | None) -> tf.keras.Model:
     """
     Loads an existing model or creates a new one with conditional classifier logic:
-    - If version == 'v3_0': recreate MobileNetV3 backbone from scratch and attach new classifier
-    - If version >= 'v3_1': load full model from GCS and optionally unfreeze last N layers
+    - If version == 'v3_0': recreate MobileNetV3 backbone.
+    - If version >= 'v3_1': load full model from GCS and unfreeze last N layers.
     """
     num_classes = len(label_map)
     print(f"number of classes: {num_classes}")
@@ -148,32 +144,26 @@ def load_or_create_model(label_map: dict, prev_version: str) -> tf.keras.Model:
         print("No previous version provided — creating a new base model.")
         return create_model(num_classes)
 
+    major, minor = parse_model_version(prev_version)
+
+    if (major, minor) == (3, 0):
+        print("v3_0 detected — creating a new base model.")
+        return create_model(num_classes)
+
+    print("Stateful retrain (v3_1 or higher) — loading full model.")
+    model_bucket = os.getenv("MODEL_BUCKET", "tf_models_cv")
+    model_gcs_path = f"gs://{model_bucket}/{prev_version}/{prev_version}.keras"
     try:
-        # Parse version string
-        major, minor = parse_model_version(prev_version)
-
-        if (major, minor) == (3, 0):
-            print("v3_0 detected — creating a new base model.")
-            # Directly call `create_model` instead of manually loading or building the model
-            model = create_model(num_classes)
-            print("Model created with MobileNetV3 backbone and custom classifier.")
-
-        else:
-            print("Stateful retrain (v3_1 or higher) — loading full model.")
-            model_gcs_path = f"gs://tf_models_cv/{prev_version}/{prev_version}.keras"
-            model = tf.keras.models.load_model(model_gcs_path)
-            print(f"Loaded model from {model_gcs_path}")
-
-            # Optionally: unfreeze last N layers for fine-tuning
-            unfreeze_count = 20
-            for layer in model.layers[-unfreeze_count:]:
-                layer.trainable = True
-            print(f"Unfroze last {unfreeze_count} layers for fine-tuning.")
-
+        model = tf.keras.models.load_model(model_gcs_path)
     except Exception as e:
-        print(f"Error loading or adapting model: {e}")
-        print("Falling back to creating a new model.")
-        model = create_model(num_classes)
+        raise RuntimeError(f"Failed to load previous model: {model_gcs_path}") from e
+
+    print(f"Loaded model from {model_gcs_path}")
+
+    unfreeze_count = int(os.getenv("UNFREEZE_LAYER_COUNT", "20"))
+    for layer in model.layers[-unfreeze_count:]:
+        layer.trainable = True
+    print(f"Unfroze last {unfreeze_count} layers for fine-tuning.")
 
     return model
 
@@ -225,7 +215,7 @@ def save_model(
     bucket_name: str,
 ) -> None:
     """
-    Saves the trained model in the Keras (.keras) format and its model summary as a .txt file.
+    Saves the trained model and its summary to GCS.
 
     Artifacts are stored in a versioned folder in GCS.
 

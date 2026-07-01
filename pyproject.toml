@@ -1,0 +1,52 @@
+[project]
+name = "creature-vision"
+version = "0.1.0"
+description = "Continuous retraining ML pipeline for dog breed classification."
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+dependencies = [
+    "apache-beam[gcp]>=2.60.0",
+    "flask>=3.0.0",
+    "fuzzywuzzy>=0.18.0",
+    "google-cloud-aiplatform>=1.70.0",
+    "google-cloud-bigquery>=3.25.0",
+    "google-cloud-pipeline-components>=2.18.0",
+    "google-cloud-storage>=2.18.0",
+    "kfp>=2.10.0",
+    "numpy<2.0.0",
+    "pillow>=10.0.0",
+    "python-json-logger>=2.0.7",
+    "python-levenshtein>=0.26.0",
+    "requests>=2.32.0",
+    "structlog>=24.4.0",
+    "tensorflow==2.17.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.8.0",
+]
+
+[project.scripts]
+creature-vision-preprocess = "df_flex.main:run"
+creature-vision-training = "creature_vision_training.main:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src", "src/preprocessing", "src/training"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "src/preprocessing", "src/training"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
